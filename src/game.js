@@ -105,7 +105,7 @@ document.addEventListener('pointerlockchange', () => {
 function releaseLock() { if (document.pointerLockElement) { lockByUs = true; document.exitPointerLock(); } }
 
 // ---------- cart physics ----------
-const PHY = { MAXV: 11.2, ACCEL: 8.5, BRAKE: 15, REV: 3, REVACC: 4, GRIP: 4.2, DRIFT_GRIP: 1.2, LOCK_BRAKE: 5, LOCK_SIDE_BRAKE: 12, LOCK_TURN: 2.2, STEER: 2.55, BOOSTV: 3.5, NITRO_TIME: 3, R: 0.36 };
+const PHY = { MAXV: 11.2, ACCEL: 8.5, BRAKE: 15, REV: 3, REVACC: 4, GRIP: 4.2, DRIFT_GRIP: 1.2, LOCK_BRAKE: 5, LOCK_SIDE_BRAKE: 12, LOCK_TURN: 4.8, STEER: 2.55, BOOSTV: 3.5, NITRO_TIME: 3, R: 0.36 };
 const C = { x: 0, z: 0, h: 0, vx: 0, vz: 0, yawRate: 0, steer: 0, fwd: 0, lat: 0, slip: 0, charge: 0, nitro: 0, nitroT: 0, boostT: 0, puddle: false, wasPuddle: false,
   roll: 0, tip: 0, tipV: 0, tipPeak: 0, pitch: 0, lean: 0, lookYaw: 0, wheelSpin: 0, shake: 0, crashCd: 0, accel: 0, throttle: 0, diceV: 0, dice: 0 };
 function resetCart(x, z, h) {
@@ -146,8 +146,8 @@ function physicsStep(dt, ctl) {
   if (lock) {
     // A/D keeps swinging the front around while the cart slides on (pivot)
     const pin = ctl ? input.right - input.left : 0, v = Math.hypot(C.vx, C.vz);
-    C.lockH -= pin * PHY.LOCK_TURN * clamp(v / 4, 0.3, 1) * dt;
-    C.yawRate = clamp(angDiff(C.h, C.lockH) * 12, -4, 4);
+    C.lockH -= pin * PHY.LOCK_TURN * clamp(v / 3, 0.5, 1) * dt;
+    C.yawRate = clamp(angDiff(C.h, C.lockH) * 14, -6, 6);
   }
   else C.yawRate = damp(C.yawRate, target, hand ? 5 : 8, dt);
   C.h += C.yawRate * dt;
