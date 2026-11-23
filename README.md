@@ -17,6 +17,19 @@ Arbeite die Einkaufsliste so schnell wie möglich ab und drifte danach zur Kasse
 | Maus / Finger ziehen | Umschauen |
 | Esc / P | Pause |
 
+### iPad / Touch
+Wird automatisch erkannt (am besten im Querformat). Sobald die Tastatur benutzt wird, verschwinden die Knöpfe – beim nächsten Antippen sind sie wieder da.
+
+| Touch | Aktion |
+|---|---|
+| Linke Bildschirmhälfte | Daumen hinlegen und zur Seite ziehen = Lenken (analog) |
+| GAS / BREMSE | Gas geben / bremsen & rückwärts |
+| STOPP | Hockey-Stopp (wie Leertaste) |
+| GREIFEN (halten) | Produkt einladen (leuchtet gelb, wenn ein gesuchtes Produkt in Reichweite ist) |
+| NITRO | Erscheint, wenn die Flasche voll ist – antippen zum Zünden |
+| Rechts wischen | Umschauen |
+| ❚❚ oben links | Pause |
+
 ## Regeln
 - Oben links läuft die Uhr, oben rechts steht die Einkaufsliste.
 - Fährst du zu lange zu langsam, startet ein Countdown – läuft er ab, ist die Runde vorbei. Die Mindestgeschwindigkeit ist auf dem Tacho rot markiert. Direkt vor einem gesuchten Produkt darfst du anhalten.

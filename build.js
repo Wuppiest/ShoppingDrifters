@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const r = (f) => fs.readFileSync(path.join(__dirname, f), 'utf8');
 const three = r('vendor/three.min.js').replace(/^console\.warn\([^\n]*\),/, '0,'); // drop the deprecation warning
-const game = ['src/core.js', 'src/products.js', 'src/store.js', 'src/cart.js', 'src/hazards.js', 'src/audio.js', 'src/game.js'].map(r).join('\n');
+const game = ['src/core.js', 'src/products.js', 'src/store.js', 'src/cart.js', 'src/hazards.js', 'src/audio.js', 'src/game.js', 'src/touch.js'].map(r).join('\n');
 const html = r('src/template.html')
   .replace('/*__THREE__*/', () => three)
   .replace('/*__GAME__*/', () => game);

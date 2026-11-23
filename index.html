@@ -136,7 +136,37 @@
     #dead h1 { font-size: 56px; }
     .keys { display: none; }
   }
-  body.touch .kbOnly { display: none; }
+  body.touchmode .kbOnly { display: none; }
+  .touchOnly { display: none; } body.touchmode .touchOnly { display: block; }
+
+  /* ---------- touch controls ---------- */
+  #touch { position: fixed; inset: 0; z-index: 4; display: none; pointer-events: none; }
+  body.touchmode.playing #touch { display: block; }
+  #tSteer { position: absolute; left: 0; bottom: 0; width: 44%; height: 62%; pointer-events: auto; touch-action: none; }
+  #stickHint { position: absolute; left: max(40px, env(safe-area-inset-left)); bottom: 46px; width: 190px; height: 110px; border-radius: 55px; border: 2px dashed rgba(255,255,255,.4); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 17px; font-weight: 900; letter-spacing: 1px; color: rgba(255,255,255,.75); text-shadow: 0 2px 4px rgba(0,0,0,.5); transition: opacity .2s; }
+  #stickHint small { font-size: 11px; font-weight: 700; letter-spacing: 0; opacity: .8; }
+  #stickBase { position: fixed; width: 190px; height: 90px; margin: -45px 0 0 -95px; border-radius: 45px; background: rgba(15,18,28,.35); border: 2px solid rgba(255,255,255,.45); display: none; pointer-events: none; z-index: 5; }
+  #stickBase .ar { position: absolute; top: 50%; transform: translateY(-50%); font-size: 22px; color: rgba(255,255,255,.6); }
+  #stickBase .ar.l { left: 12px; } #stickBase .ar.r { right: 12px; }
+  #stickKnob { position: absolute; left: 50%; top: 50%; width: 70px; height: 70px; margin: -35px 0 0 -35px; border-radius: 50%; background: rgba(255,255,255,.75); box-shadow: 0 3px 10px rgba(0,0,0,.35); }
+  .tbtn { position: absolute; pointer-events: auto; touch-action: none; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 50%; color: #fff; font-weight: 900; font-size: 13px; letter-spacing: .5px; background: rgba(15,18,28,.5); border: 3px solid rgba(255,255,255,.5); box-shadow: 0 4px 12px rgba(0,0,0,.3); -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; padding: 0; }
+  .tbtn .ic { font-size: 26px; line-height: 1; margin-bottom: 3px; }
+  .tbtn.down { transform: scale(.92); filter: brightness(1.3); }
+  #tGas { right: max(28px, env(safe-area-inset-right)); bottom: 30px; width: 140px; height: 140px; font-size: 17px; background: rgba(43,180,74,.55); border-color: #7dff9a; }
+  #tGas .ic { font-size: 40px; }
+  #tBrake { right: calc(max(28px, env(safe-area-inset-right)) + 158px); bottom: 30px; width: 100px; height: 100px; background: rgba(214,38,43,.5); border-color: #ff8a8a; }
+  #tStop { right: calc(max(28px, env(safe-area-inset-right)) + 140px); bottom: 150px; width: 92px; height: 92px; background: rgba(42,98,201,.5); border-color: #8ab8ff; }
+  #tGrab { right: calc(max(28px, env(safe-area-inset-right)) + 22px); bottom: 192px; width: 96px; height: 96px; background: rgba(15,18,28,.45); }
+  #tGrab.ready { background: rgba(255,210,31,.7); border-color: #fff3a0; color: #1d2230; animation: tpulse .8s infinite; }
+  #tNitro { right: calc(max(28px, env(safe-area-inset-right)) + 262px); bottom: 40px; width: 88px; height: 88px; background: rgba(79,242,255,.55); border-color: #c8fbff; color: #0a1e32; animation: tpulse .5s infinite; }
+  #tNitro.late { background: rgba(255,90,58,.75); border-color: #ffc0b0; color: #fff; animation-duration: .2s; }
+  @keyframes tpulse { 0%,100% { box-shadow: 0 0 0 0 rgba(255,255,255,.6); } 50% { box-shadow: 0 0 0 10px rgba(255,255,255,0); } }
+  kbd.tk { min-width: 0 !important; padding: 2px 10px !important; }
+  body.touchmode #pauseBtn { width: 54px; height: 54px; font-size: 18px; }
+  body.touchmode #nitro { bottom: 52vh; }
+  body.touchmode #prompt { bottom: 40vh; }
+  #rotate { display: none; position: fixed; inset: 0; z-index: 20; background: #0d1020; color: #fff; font-size: 26px; font-weight: 900; align-items: center; justify-content: center; text-align: center; line-height: 1.6; }
+  @media (orientation: portrait) { body.touchmode #rotate { display: flex; } }
 </style>
 </head>
 <body>
@@ -153,6 +183,16 @@
   <div id="turbo">TURBO!</div>
   <div id="nitro" class="hidden"><div class="t"><kbd>Shift</kbd> NITRO ZÜNDEN!</div><div class="bar"><div id="nitroBar"></div></div></div>
 </div>
+<div id="touch">
+  <div id="tSteer"><div id="stickHint">◀ LENKEN ▶<small>Daumen hier hinlegen</small></div></div>
+  <div id="stickBase"><div class="ar l">◀</div><div class="ar r">▶</div><div id="stickKnob"></div></div>
+  <button class="tbtn" id="tGas"><span class="ic">▲</span>GAS</button>
+  <button class="tbtn" id="tBrake"><span class="ic">▼</span>BREMSE</button>
+  <button class="tbtn" id="tStop"><span class="ic">⛸</span>STOPP</button>
+  <button class="tbtn" id="tGrab"><span class="ic">✋</span>GREIFEN</button>
+  <button class="tbtn hidden" id="tNitro"><span class="ic">🔥</span>NITRO</button>
+</div>
+<div id="rotate">📱↻<br>Bitte das iPad quer halten</div>
 <div id="count" class="hidden"></div>
 <div id="barT" class="bar"></div><div id="barB" class="bar"></div>
 <div id="fade"></div>
@@ -165,6 +205,11 @@
     <button class="btn" data-act="play"><span class="ic">▶</span>Spielen</button>
     <button class="btn grey" data-act="settings"><span class="ic">⚙</span>Einstellungen</button>
     <button class="btn grey" data-act="credits"><span class="ic">★</span>Credits</button>
+    <div class="keys touchOnly">
+      👈 <b>Links:</b> Daumen hinlegen &amp; zur Seite ziehen = Lenken<br>
+      👉 <b>Rechts:</b> GAS · BREMSE · STOPP (Hockey-Stopp) · GREIFEN (halten) · NITRO<br>
+      👆 Freie Fläche rechts wischen = Umschauen
+    </div>
     <div class="keys kbOnly">
       <kbd>W</kbd> Gas &nbsp; <kbd>S</kbd> Bremsen / Rückwärts &nbsp; <kbd>A</kbd><kbd>D</kbd> Lenken<br>
       <kbd>Leertaste</kbd> Hockey-Stopp (quer reinrutschen + bremsen, mit <kbd>A</kbd><kbd>D</kbd> weiterdrehen)<br>Lang driften füllt die Nitro-Flasche → <kbd>Shift</kbd> zünden (3 Sek.)<br>
@@ -2331,7 +2376,7 @@ const saveJ = (k, v) => { try { store_ && store_.setItem(k, JSON.stringify(v)); 
 const settings = loadJ('sd_settings', { vol: 0.7, music: true, quality: 'mid', fov: 78, shake: true, sens: 1 });
 const bests = loadJ('sd_bests', {});
 const IS_TOUCH = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
-if (IS_TOUCH) document.body.classList.add('touch');
+if (IS_TOUCH) document.body.classList.add('touch'); // (touch mode itself is switched in touch.js)
 
 // ---------- renderer / scene ----------
 const canvas = $('c');
@@ -3085,12 +3130,13 @@ function updatePlay(dt) {
   if (near) {
     const p = PROD[near], kmh = Math.hypot(C.vx, C.vz) * 3.6;
     if (kmh > GRAB_KMH) setPrompt(`Zu schnell für ${p.e} ${p.n}! (max. ${GRAB_KMH} km/h)`, true);
-    else setPrompt(`<kbd>E</kbd> ${p.e} ${p.n} ${kmh > 4 ? 'schnappen' : 'einladen'}`);
+    else setPrompt(`${K('E', '✋ GREIFEN')} ${p.e} ${p.n} ${kmh > 4 ? 'schnappen' : 'einladen'}`);
     if (input.grab) tryGrab(near);
   } else setPrompt(null);
   // nitro hint
   const nh = $('nitro');
   if (C.nitro > 0) {
+    if (nh.dataset.mode !== String(TOUCH.active())) { nh.dataset.mode = String(TOUCH.active()); nh.querySelector('.t').innerHTML = K('Shift', '🔥 NITRO') + ' NITRO ZÜNDEN!'; }
     nh.classList.remove('hidden'); nh.classList.toggle('late', C.nitroT < 1);
     $('nitroBar').style.width = (clamp(C.nitroT / PHY.NITRO_TIME, 0, 1) * 100).toFixed(1) + '%';
   } else nh.classList.add('hidden');
@@ -3200,6 +3246,7 @@ function frame(now) {
     const d = Math.hypot(camera.position.x - l.x, camera.position.z - l.z);
     l.hi.visible = d < lodHi; l.mid.visible = d >= lodHi && d < lodMid; l.lo.visible = d >= lodMid;
   }
+  TOUCH.update();
   // HUD
   if (G.state === 'play' || G.state === 'countdown') {
     $('time').textContent = fmt(G.time);
@@ -3259,6 +3306,91 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && (G.
 // boot
 showMenu();
 requestAnimationFrame(frame);
+
+// ============================================================
+//  Shopping Drifters – touch controls (iPad / phone)
+//  Left half: steering stick (appears under the thumb, left/right only)
+//  Right side: GAS, BREMSE, STOPP (hockey stop), GREIFEN (hold), NITRO
+//  Free area on the right: swipe to look around (handled in game.js)
+//  Using the keyboard hides the buttons, touching the screen shows them again.
+// ============================================================
+const TOUCH = (() => {
+  const layer = $('touch'), zone = $('tSteer'), base = $('stickBase'), knob = $('stickKnob');
+  let steerId = null, sx = 0, sy = 0;
+  const RANGE = 70;
+  function setTouchMode(on) {
+    document.body.classList.toggle('touchmode', on);
+    if (!on) release();
+  }
+  // steering stick
+  zone.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); SFX.init();
+    if (steerId !== null) return;
+    steerId = e.pointerId; sx = e.clientX; sy = e.clientY;
+    try { zone.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    base.style.left = sx + 'px'; base.style.top = sy + 'px'; base.style.display = 'block';
+    knob.style.transform = 'translate(0px,0px)';
+    $('stickHint').style.opacity = 0;
+  });
+  zone.addEventListener('pointermove', (e) => {
+    if (e.pointerId !== steerId) return;
+    let dx = e.clientX - sx;
+    // the stick follows the thumb if it drifts too far
+    if (Math.abs(dx) > RANGE) { sx += dx - Math.sign(dx) * RANGE; dx = Math.sign(dx) * RANGE; base.style.left = sx + 'px'; }
+    const v = dx / RANGE, dead = 0.08, a = Math.abs(v) < dead ? 0 : Math.sign(v) * (Math.abs(v) - dead) / (1 - dead);
+    input.right = Math.max(0, a); input.left = Math.max(0, -a);
+    knob.style.transform = `translate(${dx}px,0px)`;
+  });
+  const endSteer = (e) => {
+    if (e.pointerId !== steerId) return;
+    steerId = null; input.left = input.right = 0; base.style.display = 'none'; $('stickHint').style.opacity = '';
+  };
+  zone.addEventListener('pointerup', endSteer); zone.addEventListener('pointercancel', endSteer);
+
+  // hold buttons
+  const holds = [];
+  function holdBtn(id, key, onDown) {
+    const b = $(id); let pid = null;
+    const up = (e) => { if (e && e.pointerId !== pid) return; pid = null; b.classList.remove('down'); if (key) input[key] = 0; };
+    b.addEventListener('pointerdown', (e) => {
+      e.preventDefault(); e.stopPropagation(); SFX.init();
+      pid = e.pointerId; try { b.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+      b.classList.add('down'); if (key) input[key] = 1; if (onDown) onDown();
+    });
+    b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up);
+    b.addEventListener('lostpointercapture', up);
+    holds.push(() => up(null));
+  }
+  holdBtn('tGas', 'up');
+  holdBtn('tBrake', 'down');
+  holdBtn('tStop', 'drift');
+  holdBtn('tGrab', 'grab');
+  holdBtn('tNitro', null, () => fireNitro());
+  function release() {
+    for (const h of holds) h();
+    if (steerId !== null) { steerId = null; base.style.display = 'none'; }
+    for (const k in input) input[k] = 0;
+  }
+  // switch between touch and keyboard
+  window.addEventListener('pointerdown', (e) => { if (e.pointerType === 'touch' || e.pointerType === 'pen') setTouchMode(true); }, true);
+  window.addEventListener('keydown', (e) => { if (!e.repeat && document.body.classList.contains('touchmode') && !e.metaKey) setTouchMode(false); }, true);
+  if (IS_TOUCH) setTouchMode(true);
+  layer.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  let lastPlaying = null;
+  // per frame: show/hide, highlight buttons depending on the situation
+  function update() {
+    const playing = G.state === 'play' || G.state === 'countdown';
+    if (playing !== lastPlaying) { document.body.classList.toggle('playing', playing); lastPlaying = playing; if (!playing) release(); }
+    if (!playing) return;
+    $('tNitro').classList.toggle('hidden', !(C.nitro > 0));
+    $('tNitro').classList.toggle('late', C.nitro > 0 && C.nitroT < 1);
+    $('tGrab').classList.toggle('ready', !!G.near);
+  }
+  return { update, active: () => document.body.classList.contains('touchmode') };
+})();
+// key label for prompts: keyboard key, or the button name in touch mode
+function K(key, touchName) { return TOUCH.active() ? `<kbd class="tk">${touchName}</kbd>` : `<kbd>${key}</kbd>`; }
 
 </script>
 </body>

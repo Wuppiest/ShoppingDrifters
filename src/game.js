@@ -8,7 +8,7 @@ const saveJ = (k, v) => { try { store_ && store_.setItem(k, JSON.stringify(v)); 
 const settings = loadJ('sd_settings', { vol: 0.7, music: true, quality: 'mid', fov: 78, shake: true, sens: 1 });
 const bests = loadJ('sd_bests', {});
 const IS_TOUCH = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
-if (IS_TOUCH) document.body.classList.add('touch');
+if (IS_TOUCH) document.body.classList.add('touch'); // (touch mode itself is switched in touch.js)
 
 // ---------- renderer / scene ----------
 const canvas = $('c');
@@ -762,12 +762,13 @@ function updatePlay(dt) {
   if (near) {
     const p = PROD[near], kmh = Math.hypot(C.vx, C.vz) * 3.6;
     if (kmh > GRAB_KMH) setPrompt(`Zu schnell für ${p.e} ${p.n}! (max. ${GRAB_KMH} km/h)`, true);
-    else setPrompt(`<kbd>E</kbd> ${p.e} ${p.n} ${kmh > 4 ? 'schnappen' : 'einladen'}`);
+    else setPrompt(`${K('E', '✋ GREIFEN')} ${p.e} ${p.n} ${kmh > 4 ? 'schnappen' : 'einladen'}`);
     if (input.grab) tryGrab(near);
   } else setPrompt(null);
   // nitro hint
   const nh = $('nitro');
   if (C.nitro > 0) {
+    if (nh.dataset.mode !== String(TOUCH.active())) { nh.dataset.mode = String(TOUCH.active()); nh.querySelector('.t').innerHTML = K('Shift', '🔥 NITRO') + ' NITRO ZÜNDEN!'; }
     nh.classList.remove('hidden'); nh.classList.toggle('late', C.nitroT < 1);
     $('nitroBar').style.width = (clamp(C.nitroT / PHY.NITRO_TIME, 0, 1) * 100).toFixed(1) + '%';
   } else nh.classList.add('hidden');
@@ -877,6 +878,7 @@ function frame(now) {
     const d = Math.hypot(camera.position.x - l.x, camera.position.z - l.z);
     l.hi.visible = d < lodHi; l.mid.visible = d >= lodHi && d < lodMid; l.lo.visible = d >= lodMid;
   }
+  TOUCH.update();
   // HUD
   if (G.state === 'play' || G.state === 'countdown') {
     $('time').textContent = fmt(G.time);
