@@ -52,12 +52,9 @@ const eyeObj = new T.Object3D(); cart.body.add(eyeObj);
 // third-person body of the rider (hidden in first person)
 const riderTP = (() => {
   const o = new Obj();
-  o.box(0.42, 0.5, 0.26, 0, 1.16, -0.87, '#2a7de1', { rx: -0.5 });
-  o.box(0.36, 0.16, 0.26, 0, 0.95, -0.76, '#2b3550', { rx: -0.5 });
-  o.box(0.12, 0.1, 0.12, 0, 1.45, -0.99, '#f0c29a');
-  o.sph(0.14, 0, 1.6, -1.0, '#f0c29a', { seg: 7 });
-  o.box(0.3, 0.08, 0.3, 0, 1.72, -1.02, '#e8322b');
-  o.box(0.26, 0.03, 0.14, 0, 1.69, -1.18, '#e8322b'); // cap turned backwards
+  const P = { shirt: '#2a7de1', pants: '#2b3550', skin: '#f0c29a', hair: '#3a2412', style: 'cap', capColor: '#e8322b', capBack: true, logo: '#ffd21f' };
+  addTorso(o, 0, 0.78, -0.7, P, -0.42);
+  addHead(o, 0, 1.6, -1.0, P);
   const m = new MeshAcc().addObj(o).build(VCMAT); m.castShadow = true; return m;
 })();
 cart.body.add(riderTP);
@@ -757,10 +754,11 @@ function frame(now) {
   if (G.state !== 'play') updateHazards(dt, G.clock, 999, 999, 0, null);
   updatePuffs(dt);
   // product level of detail: full models only for nearby shelf blocks
-  const lodD = settings.quality === 'high' ? 20 : settings.quality === 'mid' ? 14 : 9;
+  const lodHi = settings.quality === 'high' ? 8 : settings.quality === 'mid' ? 5.5 : 3.5;
+  const lodMid = settings.quality === 'high' ? 20 : settings.quality === 'mid' ? 13 : 8;
   for (const l of PRODUCT_LOD) {
-    const near = Math.hypot(camera.position.x - l.x, camera.position.z - l.z) < lodD;
-    l.hi.visible = near; l.lo.visible = !near;
+    const d = Math.hypot(camera.position.x - l.x, camera.position.z - l.z);
+    l.hi.visible = d < lodHi; l.mid.visible = d >= lodHi && d < lodMid; l.lo.visible = d >= lodMid;
   }
   // HUD
   if (G.state === 'play' || G.state === 'countdown') {
