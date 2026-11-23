@@ -12,7 +12,7 @@ Arbeite die Einkaufsliste so schnell wie möglich ab und drifte danach zur Kasse
 | S | Bremsen / Rückwärts |
 | A / D | Lenken |
 | Leertaste | Räder gerade + Heck reinziehen + mäßig bremsen – rettet dich aus einem Drift |
-| | Der Wagen driftet von selbst – lange driften und dann geradeziehen = **Turbo** |
+| Shift | **Nitro zünden** – lange driften und geradeziehen füllt die Nitro-Flasche am Lenker, dann hast du 3 Sekunden |
 | E | Produkt einladen (vor dem Regal abbremsen!) |
 | Maus / Finger ziehen | Umschauen |
 | Esc / P | Pause |

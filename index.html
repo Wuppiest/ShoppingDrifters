@@ -63,6 +63,14 @@
   #toast.show { opacity: 1; transition: none; }
   #turbo { position: absolute; top: 60%; left: 50%; transform: translateX(-50%) skewX(-12deg); font-size: 46px; font-weight: 900; font-style: italic; color: #4ff2ff; letter-spacing: 3px; opacity: 0; transition: opacity .4s; text-shadow: 0 0 18px #1aa3ff, 0 3px 0 #0a3a6a; }
   #turbo.show { opacity: 1; transition: none; }
+  #nitro { position: absolute; bottom: 45vh; left: 50%; transform: translateX(-50%); text-align: center; padding: 8px 16px; background: rgba(10,30,50,.7); border: 2px solid #4ff2ff; border-radius: 14px; box-shadow: 0 0 18px rgba(79,242,255,.5); }
+  #nitro .t { font-size: 20px; font-weight: 900; color: #4ff2ff; letter-spacing: 1px; font-style: italic; }
+  #nitro kbd { display: inline-block; padding: 1px 8px; border-radius: 7px; background: #4ff2ff; color: #0a1e32; border-bottom: 3px solid #1a8aa0; font-style: normal; font-family: inherit; margin-right: 6px; }
+  #nitro .bar { margin-top: 6px; height: 7px; background: rgba(255,255,255,.2); border-radius: 4px; overflow: hidden; }
+  #nitro .bar div { height: 100%; width: 100%; background: #4ff2ff; }
+  #nitro.late { border-color: #ff5a3a; box-shadow: 0 0 18px rgba(255,90,58,.6); animation: nshake .15s infinite; }
+  #nitro.late .t { color: #ff8a6a; } #nitro.late .bar div { background: #ff5a3a; }
+  @keyframes nshake { 0%,100% { transform: translateX(-50%); } 50% { transform: translateX(calc(-50% + 3px)); } }
   #vignette { position: absolute; inset: 0; box-shadow: inset 0 0 160px rgba(255,0,0,.0); transition: box-shadow .2s; }
 
   #count { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); z-index: 8; font-size: 160px; font-weight: 900; pointer-events: none; color: #ffe066; text-shadow: 0 6px 0 #a5560f, 0 0 40px rgba(0,0,0,.5); }
@@ -143,6 +151,7 @@
   <div id="slow" class="hidden shadow"><div class="t">ZU LANGSAM!</div><div class="n" id="slowN">5</div><div class="s" id="slowS">Gib Gas!</div></div>
   <div id="toast" class="shadow"></div>
   <div id="turbo">TURBO!</div>
+  <div id="nitro" class="hidden"><div class="t"><kbd>Shift</kbd> NITRO ZÜNDEN!</div><div class="bar"><div id="nitroBar"></div></div></div>
 </div>
 <div id="count" class="hidden"></div>
 <div id="barT" class="bar"></div><div id="barB" class="bar"></div>
@@ -158,7 +167,7 @@
     <button class="btn grey" data-act="credits"><span class="ic">★</span>Credits</button>
     <div class="keys kbOnly">
       <kbd>W</kbd> Gas &nbsp; <kbd>S</kbd> Bremsen / Rückwärts &nbsp; <kbd>A</kbd><kbd>D</kbd> Lenken<br>
-      <kbd>Leertaste</kbd> Räder blockieren = aus dem Drift retten<br>Lang driften + geradeziehen = Turbo!<br>
+      <kbd>Leertaste</kbd> Räder blockieren = aus dem Drift retten<br>Lang driften füllt die Nitro-Flasche → <kbd>Shift</kbd> zünden (3 Sek.)<br>
       <kbd>E</kbd> Produkt einladen &nbsp; <kbd>Maus</kbd> Umschauen &nbsp; <kbd>Esc</kbd>/<kbd>P</kbd> Pause
     </div>
   </div>
@@ -1821,7 +1830,7 @@ function buildCart() {
   die(-0.014, -0.1, 0, '#ff4fa8', '#ffffff', 0.3, 0.4, 0);
   die(0.03, -0.11, 0.012, '#ffffff', '#111111', 0, -0.3, 0.4);
   dice.add(new MeshAcc().addObj(dObj).build(VCMAT));
-  dice.position.set(-0.2, 1.23, -0.5); body.add(dice);
+  dice.position.set(0.2, 1.23, -0.5); body.add(dice);
   // small checkered flag on the back left
   const flagTex = canvasTex(64, 48, (g) => { for (let i = 0; i < 8; i++) for (let j = 0; j < 6; j++) { g.fillStyle = (i + j) % 2 ? '#111' : '#fff'; g.fillRect(i * 8, j * 8, 8, 8); } });
   const pole = new T.Mesh(new T.CylinderGeometry(0.008, 0.008, 1.0, 5), new T.MeshLambertMaterial({ color: '#ccc' }));
@@ -1857,11 +1866,44 @@ function buildCart() {
   rider.children[0].castShadow = true;
   body.add(rider);
 
+  // ---- NITRO bottle on the handlebar (right of the speedometer) ----
+  const nitro = new T.Group();
+  const no = new Obj();
+  no.cyl(0.03, 0.15, 0, 0.075, 0, '#1d6fd8', { seg: 12 });
+  no.sph(0.03, 0, 0.15, 0, '#1d6fd8', { sy: 0.6, seg: 10 });
+  no.cyl(0.0305, 0.03, 0, 0.06, 0, '#ffffff', { seg: 12 });
+  no.cyl(0.031, 0.01, 0, 0.045, 0, '#e8322b', { seg: 12 });
+  no.cyl(0.012, 0.03, 0, 0.18, 0, chrome, { seg: 8 });                      // valve
+  no.box(0.04, 0.008, 0.008, 0.018, 0.19, 0, '#e8322b');                     // valve lever
+  no.torus(0.031, 0.12, 0, 0.02, 0, chrome, { rx: PI / 2, seg: 12 });        // clamps
+  no.torus(0.031, 0.12, 0, 0.12, 0, chrome, { rx: PI / 2, seg: 12 });
+  no.box(0.02, 0.05, 0.02, 0, -0.01, 0.02, dark);                            // mount to the bar
+  no.bar(P3(0, 0.17, 0), P3(0.06, 0.06, 0.04), 0.008, '#1d6fd8', true);      // hose
+  nitro.add(new MeshAcc().addObj(no).build(VCMAT));
+  // pressure gauge facing the rider
+  const gauge = new T.Group();
+  const go2 = new Obj();
+  go2.cyl(0.028, 0.012, 0, 0, 0, chrome, { rx: PI / 2, seg: 14 });
+  go2.cyl(0.024, 0.002, 0, 0, 0.0065, '#f4f4f4', { rx: PI / 2, seg: 14 });
+  go2.box(0.022, 0.006, 0.001, 0.008, 0.008, 0.0078, '#e8322b', { rz: -0.6 });  // red zone mark
+  gauge.add(new MeshAcc().addObj(go2).build(VCMAT));
+  const nNeedle = new T.Group();
+  const nn = new T.Mesh(new T.BoxGeometry(0.003, 0.02, 0.002), new T.MeshBasicMaterial({ color: '#111111' })); nn.position.y = 0.009; nNeedle.add(nn);
+  nNeedle.position.z = 0.009; gauge.add(nNeedle);
+  gauge.position.set(0, 0.11, 0.032); nitro.add(gauge);
+  // glow ring that pulses while the bottle is under pressure
+  const nitroGlowMat = new T.MeshBasicMaterial({ color: '#4ff2ff', transparent: true, opacity: 0, depthWrite: false });
+  const ring = new T.Mesh(new T.TorusGeometry(0.036, 0.007, 6, 18), nitroGlowMat); ring.rotation.x = PI / 2; ring.position.y = 0.075; nitro.add(ring);
+  const ring2 = ring.clone(); ring2.position.y = 0.035; nitro.add(ring2);
+  nitro.position.set(-0.17, 1.245, -0.49); nitro.rotation.set(0, PI, 0); nitro.scale.setScalar(0.8);
+  body.add(nitro);
+  gauge.rotation.x = -0.5;
+
   // basket item holder
   const items = new T.Group(); body.add(items);
 
   return {
-    root, body, wheels: wheelObjs, flames, flameMat, flameCore, underLight, needle, dice, flag, rider, items, drawDial, glow,
+    root, body, wheels: wheelObjs, nitro, nitroNeedle: nNeedle, nitroGlowMat, flames, flameMat, flameCore, underLight, needle, dice, flag, rider, items, drawDial, glow,
     eye: new V3(0, 1.66, -0.9),
   };
 }
@@ -2228,6 +2270,8 @@ const SFX = (() => {
     win() { [523, 659, 784, 1046, 784, 1046].forEach((f, i) => tone({ type: 'triangle', f0: f, dur: 0.22, v: 0.14, delay: i * 0.1 })); },
     lose() { [392, 330, 262, 196].forEach((f, i) => tone({ type: 'sawtooth', f0: f, dur: 0.35, v: 0.08, delay: i * 0.22, filter: 1400 })); },
     boost() { noise({ dur: 0.5, v: 0.25, type: 'bandpass', f0: 400, f1: 3000, q: 1.5 }); tone({ type: 'sawtooth', f0: 120, f1: 380, dur: 0.4, v: 0.08, filter: 1500 }); },
+    nitroReady() { tone({ type: 'triangle', f0: 880, f1: 1760, dur: 0.18, v: 0.12 }); noise({ dur: 0.25, v: 0.08, type: 'highpass', f0: 4000, delay: 0.05 }); },
+    hiss() { noise({ dur: 0.7, v: 0.18, type: 'highpass', f0: 3000, f1: 1200, a: 0.02 }); },
     splash() { noise({ dur: 0.35, v: 0.2, type: 'bandpass', f0: 2500, f1: 700, q: 1 }); },
     hey() { tone({ type: 'sawtooth', f0: 260, f1: 340, dur: 0.18, v: 0.06, filter: 1200 }); tone({ type: 'sawtooth', f0: 340, f1: 220, dur: 0.22, v: 0.06, delay: 0.18, filter: 1200 }); },
     rumble() { noise({ dur: 1.0, v: 0.3, f0: 300, f1: 60 }); for (let i = 0; i < 5; i++) noise({ dur: 0.12, v: 0.2, f0: 1200, delay: 0.2 + i * 0.12 }); },
@@ -2338,6 +2382,7 @@ window.addEventListener('keydown', (e) => {
   if (e.repeat) return;
   const key = (e.key || '').toLowerCase();
   if (e.code === 'KeyE' || key === 'e') onInteract();
+  if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || key === 'shift') fireNitro();
   if (e.code === 'Escape' || e.code === 'KeyP' || key === 'escape' || key === 'p') togglePause();
   if ((e.code === 'Enter' || key === 'enter') && G.state === 'checkout' && G.co && G.co.shown) nextLevel();
 });
@@ -2371,11 +2416,11 @@ document.addEventListener('pointerlockchange', () => {
 function releaseLock() { if (document.pointerLockElement) { lockByUs = true; document.exitPointerLock(); } }
 
 // ---------- cart physics ----------
-const PHY = { MAXV: 11.2, ACCEL: 8.5, BRAKE: 15, REV: 3, REVACC: 4, GRIP: 4.2, DRIFT_GRIP: 1.2, LOCK_GRIP: 2.6, LOCK_BRAKE: 5, STEER: 2.55, BOOSTV: 3.5, R: 0.36 };
-const C = { x: 0, z: 0, h: 0, vx: 0, vz: 0, yawRate: 0, steer: 0, fwd: 0, lat: 0, slip: 0, charge: 0, boostT: 0, puddle: false, wasPuddle: false,
+const PHY = { MAXV: 11.2, ACCEL: 8.5, BRAKE: 15, REV: 3, REVACC: 4, GRIP: 4.2, DRIFT_GRIP: 1.2, LOCK_GRIP: 2.6, LOCK_BRAKE: 5, STEER: 2.55, BOOSTV: 3.5, NITRO_TIME: 3, R: 0.36 };
+const C = { x: 0, z: 0, h: 0, vx: 0, vz: 0, yawRate: 0, steer: 0, fwd: 0, lat: 0, slip: 0, charge: 0, nitro: 0, nitroT: 0, boostT: 0, puddle: false, wasPuddle: false,
   roll: 0, tip: 0, tipV: 0, tipPeak: 0, pitch: 0, lean: 0, lookYaw: 0, wheelSpin: 0, shake: 0, crashCd: 0, accel: 0, throttle: 0, diceV: 0, dice: 0 };
 function resetCart(x, z, h) {
-  Object.assign(C, { x, z, h, vx: 0, vz: 0, yawRate: 0, steer: 0, fwd: 0, lat: 0, slip: 0, charge: 0, boostT: 0, roll: 0, tip: 0, tipV: 0, tipPeak: 0, pitch: 0, lean: 0, lookYaw: 0, shake: 0 });
+  Object.assign(C, { x, z, h, vx: 0, vz: 0, yawRate: 0, steer: 0, fwd: 0, lat: 0, slip: 0, charge: 0, nitro: 0, nitroT: 0, boostT: 0, roll: 0, tip: 0, tipV: 0, tipPeak: 0, pitch: 0, lean: 0, lookYaw: 0, shake: 0 });
   look.yaw = look.pitch = 0;
 }
 function physicsStep(dt, ctl) {
@@ -2442,11 +2487,20 @@ function physicsStep(dt, ctl) {
     SFX.crash(0.25 + C.tipPeak * 0.6); C.shake = Math.min(1, C.shake + C.tipPeak); spawnPuffs(4, '#ffffff'); C.tipPeak = 0;
   }
   if (Math.abs(C.tip) < 0.05 && Math.abs(C.tipV) < 0.1) C.tipPeak = 0;
-  // mini turbo: drift long enough, then straighten out (by itself or with space) for a boost
+  // nitro: drift long enough and straighten out → the drift energy goes into the nitro bottle.
+  // You then have NITRO_TIME seconds to fire it with Shift before the pressure is gone.
   if (hand && C.slip > 0.25 && sp > 4) C.charge += dt;
   else if (C.slip < 0.12 || sp < 2) {
-    if (C.charge > 1.0 && sp >= 2) { C.boostT = 0.55 + Math.min(C.charge, 2.5) * 0.3; SFX.boost(); flash($('turbo'), 900); spawnPuffs(4, '#9ff6ff'); }
+    if (C.charge > 1.0 && sp >= 2) {
+      const fresh = C.nitro <= 0;
+      C.nitro = Math.max(C.nitro, 0.55 + Math.min(C.charge, 2.5) * 0.3); C.nitroT = PHY.NITRO_TIME;
+      if (fresh) SFX.nitroReady();
+    }
     C.charge = 0;
+  }
+  if (C.nitro > 0) {
+    C.nitroT -= dt;
+    if (C.nitroT <= 0) { C.nitro = 0; SFX.hiss(); nitroPuff(); }
   }
   collide(dt);
 }
@@ -2493,6 +2547,15 @@ function collide(dt) {
     C.yawRate += (Math.random() - 0.5) * impact * 0.25;
     spawnPuffs(Math.min(8, 2 + impact), '#ffffff');
   }
+}
+function fireNitro() {
+  if (G.state !== 'play' || C.nitro <= 0) return;
+  C.boostT = C.nitro; C.nitro = 0; C.nitroT = 0;
+  SFX.boost(); flash($('turbo'), 900); spawnPuffs(5, '#9ff6ff'); C.shake = Math.min(1, C.shake + 0.3);
+}
+function nitroPuff() { // pressure escapes from the valve
+  const p = new V3(0, 0.2, 0); cart.nitro.localToWorld(p);
+  for (let i = 0; i < 6; i++) spawnPuff(p.x, p.y, p.z, R(-0.6, 0.6), R(0.6, 1.4), R(-0.6, 0.6), 0.7, 0.04, '#e6f7ff');
 }
 function bumpShopper(c) {
   for (const sh of HZ.shoppers) if (sh.col === c && sh.bump <= 0) { sh.bump = 1.2; SFX.hey(); toast(pick(['Hey! Pass doch auf!', 'Rowdy!', 'Unverschämtheit!', 'Mein Joghurt!!'])); }
@@ -2691,7 +2754,7 @@ function togglePause(force) {
   }
 }
 function die() {
-  G.state = 'dead'; releaseLock(); SFX.lose();
+  G.state = 'dead'; releaseLock(); SFX.lose(); C.nitro = 0; show('nitro', false);
   $('deadMsg').textContent = pick(['Dein Einkaufswagen ist eingeschlafen.', 'Der Motor ist abgesoffen.', 'Selbst die Oma mit Rollator war schneller.', 'Der Wagen hat sich gelangweilt.']) + ` (Mindestens ${G.cfg.minKmh} km/h!)`;
   show('dead'); show('hud', false); setPrompt(null); show('slow', false);
 }
@@ -2744,7 +2807,7 @@ function updateItems(dt) {
 
 // ---------- checkout ----------
 function startCheckout(lane) {
-  G.state = 'checkout'; releaseLock(); setPrompt(null); show('slow', false);
+  G.state = 'checkout'; releaseLock(); setPrompt(null); show('slow', false); C.nitro = 0; show('nitro', false);
   G.lane = lane;
   const best = bests['L' + G.level];
   G.isRecord = !best || G.time < best;
@@ -2885,7 +2948,7 @@ function updateCartVisual(dt, engineOn) {
   C.wheelSpin += (C.fwd * dt) / 0.08;
   for (const w of cart.wheels) w.rotation.x = C.wheelSpin;
   // flames
-  const blue = C.boostT > 0 || C.charge > 1.0;
+  const blue = C.boostT > 0;
   const fl = engineOn ? (C.boostT > 0 ? 1.6 : C.throttle ? 1 : 0.25) : 0;
   cart.flameMat.color.set(blue ? '#3aa8ff' : '#ff8a1f'); cart.flameCore.color.set(blue ? '#d8f6ff' : '#fff3a0');
   for (const f of cart.flames) { const s = fl * (0.8 + Math.random() * 0.4); f.visible = s > 0.05; f.scale.set(1, 1, Math.max(0.01, s)); }
@@ -2897,6 +2960,13 @@ function updateCartVisual(dt, engineOn) {
   C.diceV += (-(C.yawRate * 0.5) - C.dice * 20) * dt; C.diceV *= Math.exp(-2 * dt); C.dice += C.diceV * dt;
   cart.dice.rotation.z = C.dice; cart.dice.rotation.x = clamp(C.accel * 0.02, -0.5, 0.5);
   cart.flag.rotation.y = PI / 2 + Math.sin(G.clock * 9) * 0.15 * (0.3 + sp / 8);
+  // nitro bottle: gauge shows the charge while drifting, then the pressure dropping over the 3 s
+  const pres = C.nitro > 0 ? clamp(C.nitroT / PHY.NITRO_TIME, 0, 1) : C.boostT > 0 ? 0 : clamp(C.charge / 1.0, 0, 1) * 0.8;
+  C.gauge = damp(C.gauge || 0, pres, 10, dt);
+  cart.nitroNeedle.rotation.z = 2.2 - 4.4 * C.gauge + (C.nitro > 0 ? (Math.random() - 0.5) * 0.08 : 0);
+  const pulse = C.nitro > 0 ? 0.5 + 0.5 * Math.sin(G.clock * (8 + (1 - C.nitroT / PHY.NITRO_TIME) * 22)) : 0;
+  cart.nitroGlowMat.opacity = C.nitro > 0 ? 0.35 + pulse * 0.6 : C.boostT > 0 ? 0.9 : 0;
+  cart.nitroGlowMat.color.set(C.nitro > 0 && C.nitroT < 1 ? '#ff5a3a' : '#4ff2ff');
   cart.underLight.intensity = 3 + Math.sin(G.clock * 4) * 0.6 + (blue ? 2 : 0);
 }
 
@@ -2935,6 +3005,12 @@ function updatePlay(dt) {
     if (sp > 3.6) setPrompt(`Zu schnell für ${p.e} ${p.n}! Bremsen <kbd>S</kbd>`, true);
     else setPrompt(`<kbd>E</kbd> ${p.e} ${p.n} einladen`);
   } else setPrompt(null);
+  // nitro hint
+  const nh = $('nitro');
+  if (C.nitro > 0) {
+    nh.classList.remove('hidden'); nh.classList.toggle('late', C.nitroT < 1);
+    $('nitroBar').style.width = (clamp(C.nitroT / PHY.NITRO_TIME, 0, 1) * 100).toFixed(1) + '%';
+  } else nh.classList.add('hidden');
   // minimum speed rule
   const kmh = sp * 3.6;
   const busy = G.items.some((it) => !it.done);

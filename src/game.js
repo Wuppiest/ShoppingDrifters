@@ -71,6 +71,7 @@ window.addEventListener('keydown', (e) => {
   if (e.repeat) return;
   const key = (e.key || '').toLowerCase();
   if (e.code === 'KeyE' || key === 'e') onInteract();
+  if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || key === 'shift') fireNitro();
   if (e.code === 'Escape' || e.code === 'KeyP' || key === 'escape' || key === 'p') togglePause();
   if ((e.code === 'Enter' || key === 'enter') && G.state === 'checkout' && G.co && G.co.shown) nextLevel();
 });
@@ -104,11 +105,11 @@ document.addEventListener('pointerlockchange', () => {
 function releaseLock() { if (document.pointerLockElement) { lockByUs = true; document.exitPointerLock(); } }
 
 // ---------- cart physics ----------
-const PHY = { MAXV: 11.2, ACCEL: 8.5, BRAKE: 15, REV: 3, REVACC: 4, GRIP: 4.2, DRIFT_GRIP: 1.2, LOCK_GRIP: 2.6, LOCK_BRAKE: 5, STEER: 2.55, BOOSTV: 3.5, R: 0.36 };
-const C = { x: 0, z: 0, h: 0, vx: 0, vz: 0, yawRate: 0, steer: 0, fwd: 0, lat: 0, slip: 0, charge: 0, boostT: 0, puddle: false, wasPuddle: false,
+const PHY = { MAXV: 11.2, ACCEL: 8.5, BRAKE: 15, REV: 3, REVACC: 4, GRIP: 4.2, DRIFT_GRIP: 1.2, LOCK_GRIP: 2.6, LOCK_BRAKE: 5, STEER: 2.55, BOOSTV: 3.5, NITRO_TIME: 3, R: 0.36 };
+const C = { x: 0, z: 0, h: 0, vx: 0, vz: 0, yawRate: 0, steer: 0, fwd: 0, lat: 0, slip: 0, charge: 0, nitro: 0, nitroT: 0, boostT: 0, puddle: false, wasPuddle: false,
   roll: 0, tip: 0, tipV: 0, tipPeak: 0, pitch: 0, lean: 0, lookYaw: 0, wheelSpin: 0, shake: 0, crashCd: 0, accel: 0, throttle: 0, diceV: 0, dice: 0 };
 function resetCart(x, z, h) {
-  Object.assign(C, { x, z, h, vx: 0, vz: 0, yawRate: 0, steer: 0, fwd: 0, lat: 0, slip: 0, charge: 0, boostT: 0, roll: 0, tip: 0, tipV: 0, tipPeak: 0, pitch: 0, lean: 0, lookYaw: 0, shake: 0 });
+  Object.assign(C, { x, z, h, vx: 0, vz: 0, yawRate: 0, steer: 0, fwd: 0, lat: 0, slip: 0, charge: 0, nitro: 0, nitroT: 0, boostT: 0, roll: 0, tip: 0, tipV: 0, tipPeak: 0, pitch: 0, lean: 0, lookYaw: 0, shake: 0 });
   look.yaw = look.pitch = 0;
 }
 function physicsStep(dt, ctl) {
@@ -175,11 +176,20 @@ function physicsStep(dt, ctl) {
     SFX.crash(0.25 + C.tipPeak * 0.6); C.shake = Math.min(1, C.shake + C.tipPeak); spawnPuffs(4, '#ffffff'); C.tipPeak = 0;
   }
   if (Math.abs(C.tip) < 0.05 && Math.abs(C.tipV) < 0.1) C.tipPeak = 0;
-  // mini turbo: drift long enough, then straighten out (by itself or with space) for a boost
+  // nitro: drift long enough and straighten out → the drift energy goes into the nitro bottle.
+  // You then have NITRO_TIME seconds to fire it with Shift before the pressure is gone.
   if (hand && C.slip > 0.25 && sp > 4) C.charge += dt;
   else if (C.slip < 0.12 || sp < 2) {
-    if (C.charge > 1.0 && sp >= 2) { C.boostT = 0.55 + Math.min(C.charge, 2.5) * 0.3; SFX.boost(); flash($('turbo'), 900); spawnPuffs(4, '#9ff6ff'); }
+    if (C.charge > 1.0 && sp >= 2) {
+      const fresh = C.nitro <= 0;
+      C.nitro = Math.max(C.nitro, 0.55 + Math.min(C.charge, 2.5) * 0.3); C.nitroT = PHY.NITRO_TIME;
+      if (fresh) SFX.nitroReady();
+    }
     C.charge = 0;
+  }
+  if (C.nitro > 0) {
+    C.nitroT -= dt;
+    if (C.nitroT <= 0) { C.nitro = 0; SFX.hiss(); nitroPuff(); }
   }
   collide(dt);
 }
@@ -226,6 +236,15 @@ function collide(dt) {
     C.yawRate += (Math.random() - 0.5) * impact * 0.25;
     spawnPuffs(Math.min(8, 2 + impact), '#ffffff');
   }
+}
+function fireNitro() {
+  if (G.state !== 'play' || C.nitro <= 0) return;
+  C.boostT = C.nitro; C.nitro = 0; C.nitroT = 0;
+  SFX.boost(); flash($('turbo'), 900); spawnPuffs(5, '#9ff6ff'); C.shake = Math.min(1, C.shake + 0.3);
+}
+function nitroPuff() { // pressure escapes from the valve
+  const p = new V3(0, 0.2, 0); cart.nitro.localToWorld(p);
+  for (let i = 0; i < 6; i++) spawnPuff(p.x, p.y, p.z, R(-0.6, 0.6), R(0.6, 1.4), R(-0.6, 0.6), 0.7, 0.04, '#e6f7ff');
 }
 function bumpShopper(c) {
   for (const sh of HZ.shoppers) if (sh.col === c && sh.bump <= 0) { sh.bump = 1.2; SFX.hey(); toast(pick(['Hey! Pass doch auf!', 'Rowdy!', 'Unverschämtheit!', 'Mein Joghurt!!'])); }
@@ -424,7 +443,7 @@ function togglePause(force) {
   }
 }
 function die() {
-  G.state = 'dead'; releaseLock(); SFX.lose();
+  G.state = 'dead'; releaseLock(); SFX.lose(); C.nitro = 0; show('nitro', false);
   $('deadMsg').textContent = pick(['Dein Einkaufswagen ist eingeschlafen.', 'Der Motor ist abgesoffen.', 'Selbst die Oma mit Rollator war schneller.', 'Der Wagen hat sich gelangweilt.']) + ` (Mindestens ${G.cfg.minKmh} km/h!)`;
   show('dead'); show('hud', false); setPrompt(null); show('slow', false);
 }
@@ -477,7 +496,7 @@ function updateItems(dt) {
 
 // ---------- checkout ----------
 function startCheckout(lane) {
-  G.state = 'checkout'; releaseLock(); setPrompt(null); show('slow', false);
+  G.state = 'checkout'; releaseLock(); setPrompt(null); show('slow', false); C.nitro = 0; show('nitro', false);
   G.lane = lane;
   const best = bests['L' + G.level];
   G.isRecord = !best || G.time < best;
@@ -618,7 +637,7 @@ function updateCartVisual(dt, engineOn) {
   C.wheelSpin += (C.fwd * dt) / 0.08;
   for (const w of cart.wheels) w.rotation.x = C.wheelSpin;
   // flames
-  const blue = C.boostT > 0 || C.charge > 1.0;
+  const blue = C.boostT > 0;
   const fl = engineOn ? (C.boostT > 0 ? 1.6 : C.throttle ? 1 : 0.25) : 0;
   cart.flameMat.color.set(blue ? '#3aa8ff' : '#ff8a1f'); cart.flameCore.color.set(blue ? '#d8f6ff' : '#fff3a0');
   for (const f of cart.flames) { const s = fl * (0.8 + Math.random() * 0.4); f.visible = s > 0.05; f.scale.set(1, 1, Math.max(0.01, s)); }
@@ -630,6 +649,13 @@ function updateCartVisual(dt, engineOn) {
   C.diceV += (-(C.yawRate * 0.5) - C.dice * 20) * dt; C.diceV *= Math.exp(-2 * dt); C.dice += C.diceV * dt;
   cart.dice.rotation.z = C.dice; cart.dice.rotation.x = clamp(C.accel * 0.02, -0.5, 0.5);
   cart.flag.rotation.y = PI / 2 + Math.sin(G.clock * 9) * 0.15 * (0.3 + sp / 8);
+  // nitro bottle: gauge shows the charge while drifting, then the pressure dropping over the 3 s
+  const pres = C.nitro > 0 ? clamp(C.nitroT / PHY.NITRO_TIME, 0, 1) : C.boostT > 0 ? 0 : clamp(C.charge / 1.0, 0, 1) * 0.8;
+  C.gauge = damp(C.gauge || 0, pres, 10, dt);
+  cart.nitroNeedle.rotation.z = 2.2 - 4.4 * C.gauge + (C.nitro > 0 ? (Math.random() - 0.5) * 0.08 : 0);
+  const pulse = C.nitro > 0 ? 0.5 + 0.5 * Math.sin(G.clock * (8 + (1 - C.nitroT / PHY.NITRO_TIME) * 22)) : 0;
+  cart.nitroGlowMat.opacity = C.nitro > 0 ? 0.35 + pulse * 0.6 : C.boostT > 0 ? 0.9 : 0;
+  cart.nitroGlowMat.color.set(C.nitro > 0 && C.nitroT < 1 ? '#ff5a3a' : '#4ff2ff');
   cart.underLight.intensity = 3 + Math.sin(G.clock * 4) * 0.6 + (blue ? 2 : 0);
 }
 
@@ -668,6 +694,12 @@ function updatePlay(dt) {
     if (sp > 3.6) setPrompt(`Zu schnell für ${p.e} ${p.n}! Bremsen <kbd>S</kbd>`, true);
     else setPrompt(`<kbd>E</kbd> ${p.e} ${p.n} einladen`);
   } else setPrompt(null);
+  // nitro hint
+  const nh = $('nitro');
+  if (C.nitro > 0) {
+    nh.classList.remove('hidden'); nh.classList.toggle('late', C.nitroT < 1);
+    $('nitroBar').style.width = (clamp(C.nitroT / PHY.NITRO_TIME, 0, 1) * 100).toFixed(1) + '%';
+  } else nh.classList.add('hidden');
   // minimum speed rule
   const kmh = sp * 3.6;
   const busy = G.items.some((it) => !it.done);

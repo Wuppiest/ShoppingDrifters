@@ -242,7 +242,7 @@ function buildCart() {
   die(-0.014, -0.1, 0, '#ff4fa8', '#ffffff', 0.3, 0.4, 0);
   die(0.03, -0.11, 0.012, '#ffffff', '#111111', 0, -0.3, 0.4);
   dice.add(new MeshAcc().addObj(dObj).build(VCMAT));
-  dice.position.set(-0.2, 1.23, -0.5); body.add(dice);
+  dice.position.set(0.2, 1.23, -0.5); body.add(dice);
   // small checkered flag on the back left
   const flagTex = canvasTex(64, 48, (g) => { for (let i = 0; i < 8; i++) for (let j = 0; j < 6; j++) { g.fillStyle = (i + j) % 2 ? '#111' : '#fff'; g.fillRect(i * 8, j * 8, 8, 8); } });
   const pole = new T.Mesh(new T.CylinderGeometry(0.008, 0.008, 1.0, 5), new T.MeshLambertMaterial({ color: '#ccc' }));
@@ -278,11 +278,44 @@ function buildCart() {
   rider.children[0].castShadow = true;
   body.add(rider);
 
+  // ---- NITRO bottle on the handlebar (right of the speedometer) ----
+  const nitro = new T.Group();
+  const no = new Obj();
+  no.cyl(0.03, 0.15, 0, 0.075, 0, '#1d6fd8', { seg: 12 });
+  no.sph(0.03, 0, 0.15, 0, '#1d6fd8', { sy: 0.6, seg: 10 });
+  no.cyl(0.0305, 0.03, 0, 0.06, 0, '#ffffff', { seg: 12 });
+  no.cyl(0.031, 0.01, 0, 0.045, 0, '#e8322b', { seg: 12 });
+  no.cyl(0.012, 0.03, 0, 0.18, 0, chrome, { seg: 8 });                      // valve
+  no.box(0.04, 0.008, 0.008, 0.018, 0.19, 0, '#e8322b');                     // valve lever
+  no.torus(0.031, 0.12, 0, 0.02, 0, chrome, { rx: PI / 2, seg: 12 });        // clamps
+  no.torus(0.031, 0.12, 0, 0.12, 0, chrome, { rx: PI / 2, seg: 12 });
+  no.box(0.02, 0.05, 0.02, 0, -0.01, 0.02, dark);                            // mount to the bar
+  no.bar(P3(0, 0.17, 0), P3(0.06, 0.06, 0.04), 0.008, '#1d6fd8', true);      // hose
+  nitro.add(new MeshAcc().addObj(no).build(VCMAT));
+  // pressure gauge facing the rider
+  const gauge = new T.Group();
+  const go2 = new Obj();
+  go2.cyl(0.028, 0.012, 0, 0, 0, chrome, { rx: PI / 2, seg: 14 });
+  go2.cyl(0.024, 0.002, 0, 0, 0.0065, '#f4f4f4', { rx: PI / 2, seg: 14 });
+  go2.box(0.022, 0.006, 0.001, 0.008, 0.008, 0.0078, '#e8322b', { rz: -0.6 });  // red zone mark
+  gauge.add(new MeshAcc().addObj(go2).build(VCMAT));
+  const nNeedle = new T.Group();
+  const nn = new T.Mesh(new T.BoxGeometry(0.003, 0.02, 0.002), new T.MeshBasicMaterial({ color: '#111111' })); nn.position.y = 0.009; nNeedle.add(nn);
+  nNeedle.position.z = 0.009; gauge.add(nNeedle);
+  gauge.position.set(0, 0.11, 0.032); nitro.add(gauge);
+  // glow ring that pulses while the bottle is under pressure
+  const nitroGlowMat = new T.MeshBasicMaterial({ color: '#4ff2ff', transparent: true, opacity: 0, depthWrite: false });
+  const ring = new T.Mesh(new T.TorusGeometry(0.036, 0.007, 6, 18), nitroGlowMat); ring.rotation.x = PI / 2; ring.position.y = 0.075; nitro.add(ring);
+  const ring2 = ring.clone(); ring2.position.y = 0.035; nitro.add(ring2);
+  nitro.position.set(-0.17, 1.245, -0.49); nitro.rotation.set(0, PI, 0); nitro.scale.setScalar(0.8);
+  body.add(nitro);
+  gauge.rotation.x = -0.5;
+
   // basket item holder
   const items = new T.Group(); body.add(items);
 
   return {
-    root, body, wheels: wheelObjs, flames, flameMat, flameCore, underLight, needle, dice, flag, rider, items, drawDial, glow,
+    root, body, wheels: wheelObjs, nitro, nitroNeedle: nNeedle, nitroGlowMat, flames, flameMat, flameCore, underLight, needle, dice, flag, rider, items, drawDial, glow,
     eye: new V3(0, 1.66, -0.9),
   };
 }

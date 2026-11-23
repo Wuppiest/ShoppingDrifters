@@ -131,6 +131,8 @@ const SFX = (() => {
     win() { [523, 659, 784, 1046, 784, 1046].forEach((f, i) => tone({ type: 'triangle', f0: f, dur: 0.22, v: 0.14, delay: i * 0.1 })); },
     lose() { [392, 330, 262, 196].forEach((f, i) => tone({ type: 'sawtooth', f0: f, dur: 0.35, v: 0.08, delay: i * 0.22, filter: 1400 })); },
     boost() { noise({ dur: 0.5, v: 0.25, type: 'bandpass', f0: 400, f1: 3000, q: 1.5 }); tone({ type: 'sawtooth', f0: 120, f1: 380, dur: 0.4, v: 0.08, filter: 1500 }); },
+    nitroReady() { tone({ type: 'triangle', f0: 880, f1: 1760, dur: 0.18, v: 0.12 }); noise({ dur: 0.25, v: 0.08, type: 'highpass', f0: 4000, delay: 0.05 }); },
+    hiss() { noise({ dur: 0.7, v: 0.18, type: 'highpass', f0: 3000, f1: 1200, a: 0.02 }); },
     splash() { noise({ dur: 0.35, v: 0.2, type: 'bandpass', f0: 2500, f1: 700, q: 1 }); },
     hey() { tone({ type: 'sawtooth', f0: 260, f1: 340, dur: 0.18, v: 0.06, filter: 1200 }); tone({ type: 'sawtooth', f0: 340, f1: 220, dur: 0.22, v: 0.06, delay: 0.18, filter: 1200 }); },
     rumble() { noise({ dur: 1.0, v: 0.3, f0: 300, f1: 60 }); for (let i = 0; i < 5; i++) noise({ dur: 0.12, v: 0.2, f0: 1200, delay: 0.2 + i * 0.12 }); },
