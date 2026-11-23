@@ -91,6 +91,15 @@ function atlasLabel(aspect, draw, big = false, bg = null) {
   return { u0: (x + e) / ATLAS_S, u1: (x + w - e) / ATLAS_S, v0: 1 - (y + h - e) / ATLAS_S, v1: 1 - (y + e) / ATLAS_S };
 }
 
+// remember / rewind the atlas fill level (world switch: world-specific labels are redrawn)
+const atlasMark = () => ({ big: atlasBig, small: atlasSmall });
+function atlasRewind(m) {
+  const g = ATLAS_G; g.fillStyle = '#ffffff';
+  for (let i = m.big; i < atlasBig && i < 32; i++) g.fillRect((i % 8) * 256, Math.floor(i / 8) * 256, 256, 256);
+  for (let i = m.small; i < atlasSmall; i++) { const k = i % 128; if (k === 0) continue; g.fillRect((k % 16) * 128, 1024 + Math.floor(k / 16) * 128, 128, 128); }
+  atlasBig = m.big; atlasSmall = m.small; ATLAS.needsUpdate = true;
+}
+const atlasFree = () => ({ big: 32 - atlasBig, small: 128 - atlasSmall });
 // many tiny labels sharing small atlas cells (e.g. price tags): returns n uv rects
 function atlasSheet(nx, ny, n, draw, bg = '#ffffff') {
   const out = [];

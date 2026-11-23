@@ -119,10 +119,8 @@ function clearHazards(scene) {
   DYN_BOXES.length = 0; DYN_CIRCLES.length = 0;
 }
 let WET_UV = null;
-const puddleMat = new T.MeshLambertMaterial({ color: '#8fd3ff', transparent: true, opacity: 0.55, depthWrite: false });
-const puddleShine = new T.MeshBasicMaterial({ color: '#e6f7ff', transparent: true, opacity: 0.5, depthWrite: false });
-function setupHazards(scene, level) {
-  clearHazards(scene);
+// permanent labels (drawn once before the world-specific part of the atlas)
+function makeHazardLabels() {
   if (!WET_UV) WET_UV = atlasLabel(0.64, (g, x, y, w, h) => {
     g.fillStyle = '#ffd21f'; g.fillRect(x, y, w, h);
     g.fillStyle = '#1d2230'; g.beginPath(); g.moveTo(x + w / 2, y + h * 0.06); g.lineTo(x + w * 0.92, y + h * 0.55); g.lineTo(x + w * 0.08, y + h * 0.55); g.closePath(); g.fill();
@@ -130,6 +128,12 @@ function setupHazards(scene, level) {
     g.fillStyle = '#1d2230'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = `900 ${h * 0.3}px ${FONT}`; g.fillText('!', x + w / 2, y + h * 0.37);
     fitText(g, 'VORSICHT', x + w / 2, y + h * 0.68, w * 0.9, h * 0.13); fitText(g, 'Rutschgefahr', x + w / 2, y + h * 0.84, w * 0.9, h * 0.1, 800);
   }, false, '#ffd21f');
+}
+const puddleMat = new T.MeshLambertMaterial({ color: '#8fd3ff', transparent: true, opacity: 0.55, depthWrite: false });
+const puddleShine = new T.MeshBasicMaterial({ color: '#e6f7ff', transparent: true, opacity: 0.5, depthWrite: false });
+function setupHazards(scene, level) {
+  clearHazards(scene);
+  makeHazardLabels();
   const cfg = levelCfg(level);
   rng = mulberry32(1000 + level * 17);
   const aisleSpot = () => { const a = RI(0, 6), h = RI(0, 1), A = AISLES[a]; const [za, zb] = HALVES[h]; return { a, h, A, za, zb }; };

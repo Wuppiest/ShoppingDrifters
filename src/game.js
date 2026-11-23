@@ -19,7 +19,8 @@ const scene = new T.Scene();
 scene.background = new T.Color('#a9d8ff');
 scene.fog = new T.Fog('#e9e4d8', 28, 75);
 const camera = new T.PerspectiveCamera(settings.fov, 1, 0.05, 300);
-scene.add(new T.HemisphereLight('#ffffff', '#b3a58e', 1.55));
+const hemi = new T.HemisphereLight('#ffffff', '#b3a58e', 1.55);
+scene.add(hemi);
 const sun = new T.DirectionalLight('#fff4e2', 1.5);
 sun.castShadow = true;
 sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.02;
@@ -43,10 +44,37 @@ applyQuality(); resize();
 window.addEventListener('resize', resize);
 
 // ---------- world ----------
-buildProductGeos();
-buildStore(scene);
-buildCashiers(scene);
-const cart = buildCart();
+const cart = buildCart();       // the cart's decals stay in the atlas for good
+makeHazardLabels();
+const ATLAS_BASE = atlasMark(); // everything after this is redrawn per world
+let storeGroup = null;
+function disposeTree(g) {
+  g.traverse((o) => {
+    if (!o.isMesh) return;
+    if (o.geometry && !o.isInstancedMesh) o.geometry.dispose();
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    for (const m of mats) if (m && m !== VCMAT) { if (m.map && m.map !== ATLAS) m.map.dispose(); m.dispose(); }
+  });
+}
+const LIGHT_BASE = { hemi: 1.55, sun: 1.5, fog: null };
+// build a whole world: products, store, cashiers, light & fog
+function loadWorld(id) {
+  const W = WORLDS[id] || WORLDS.std;
+  if (storeGroup) { scene.remove(storeGroup); disposeTree(storeGroup); }
+  CASHIERS.length = 0;
+  atlasRewind(ATLAS_BASE);
+  buildProductGeos(worldProductIds(W).map((k) => PROD[k]));
+  storeGroup = new T.Group(); scene.add(storeGroup);
+  buildStore(storeGroup, W);
+  buildCashiers(storeGroup);
+  scene.background = new T.Color(W.light.bg);
+  scene.fog.color.set(W.fog[0]); scene.fog.near = W.fog[1]; scene.fog.far = W.fog[2];
+  hemi.color.set(W.light.hemi[0]); hemi.groundColor.set(W.light.hemi[1]); hemi.intensity = W.light.hemi[2];
+  sun.color.set(W.light.sun[0]); sun.intensity = W.light.sun[1];
+  LIGHT_BASE.hemi = hemi.intensity; LIGHT_BASE.sun = sun.intensity; LIGHT_BASE.fog = scene.fog.color.clone();
+  G.world = W.id;
+  const free = atlasFree(); if (free.small < 0 || free.big < 0) console.warn('atlas full', free);
+}
 scene.add(cart.root);
 const eyeObj = new T.Object3D(); cart.body.add(eyeObj);
 // third-person body of the rider (hidden in first person)
@@ -128,7 +156,7 @@ function physicsStep(dt, ctl) {
     else if (fwd < maxV) fwd += PHY.ACCEL * Math.pow(clamp(1 - fwd / maxV, 0, 1), 0.55) * dt;
   }
   if (down) {
-    if (fwd > 0.25) fwd = Math.max(0, fwd - PHY.BRAKE * dt);
+    if (fwd > 0.25) fwd = Math.max(0, fwd - PHY.BRAKE * (0.5 + 0.5 * CUR_WORLD.grip) * dt);
     else fwd = Math.max(-PHY.REV, fwd - PHY.REVACC * dt);
   }
   if (!up && !down) fwd -= Math.sign(fwd) * Math.min(Math.abs(fwd), (0.3 + Math.abs(fwd) * 0.1) * dt);
@@ -157,11 +185,11 @@ function physicsStep(dt, ctl) {
   if (lock && spd > 0.01) {
     // slide on in the same direction, braking: ~5 m/s² straight, up to ~12 m/s² fully sideways
     const side = Math.abs(Math.sin(angDiff(Math.atan2(vx, vz), C.h)));
-    const nsp = Math.max(0, spd - lerp(PHY.LOCK_BRAKE, PHY.LOCK_SIDE_BRAKE, side) * (C.puddle ? 0.35 : 1) * dt);
+    const nsp = Math.max(0, spd - lerp(PHY.LOCK_BRAKE, PHY.LOCK_SIDE_BRAKE, side) * (C.puddle ? 0.35 : 1) * (0.4 + 0.6 * CUR_WORLD.grip) * dt);
     vx *= nsp / spd; vz *= nsp / spd; spd = nsp;
   } else if (spd > 0.05) {
     const th = C.h + (fwd < 0 ? PI : 0);
-    let grip = hand ? PHY.DRIFT_GRIP : PHY.GRIP;
+    let grip = (hand ? PHY.DRIFT_GRIP : PHY.GRIP) * CUR_WORLD.grip;
     if (C.puddle) grip *= 0.2;
     let d = angDiff(Math.atan2(vx, vz), th) * Math.exp(-grip * dt); // remaining slip angle
     const maxSlip = C.puddle ? 1.3 : hand ? 0.95 : 0.7;
@@ -378,15 +406,16 @@ function makeMarker(sp) {
 const G = { state: 'menu', level: 1, time: 0, clock: 0, list: [], got: new Set(), markers: {}, near: null, slowT: 0, sinceGo: 0, cfg: levelCfg(1),
   anim: null, cine: null, lane: null, scan: null, items: [], total: 0, prev: 'menu', pausedFrom: null };
 
+const bestKey = (lv = G.level) => (G.world === 'std' ? '' : G.world + '_') + 'L' + lv;
 function pickList(level) {
-  rng = mulberry32(777 + level * 131);
+  rng = mulberry32(777 + level * 131 + WORLD_ORDER.indexOf(G.world) * 9973);
   const cfg = levelCfg(level);
-  const pool = shuffle(PRODUCTS.slice());
+  const pool = shuffle(PRODUCTS.filter((p) => SPOTS[p.id] && p.section));
   const perSec = {}, out = [];
   for (const p of pool) {
     if (out.length >= cfg.items) break;
     if ((perSec[p.section] || 0) >= 2) continue;
-    if (level === 1 && p.section === 'Obst & Gemüse' && out.some((q) => q.section === p.section)) continue;
+    if (level === 1 && p.section === CUR_WORLD.front.n && out.some((q) => q.section === p.section)) continue;
     perSec[p.section] = (perSec[p.section] || 0) + 1;
     out.push(p);
   }
@@ -449,8 +478,14 @@ function showMenu() {
   setupLevel(1);
   resetCart(MENU_POS.x, MENU_POS.z, PI / 2);
 }
+let selWorld = 'std';
 function startGame() {
   ['menu', 'worlds'].forEach((id) => show(id, false));
+  if (selWorld !== G.world) {
+    show('loading'); // give the browser one frame to show the loading screen
+    setTimeout(() => { loadWorld(selWorld); show('loading', false); startGame(); }, 60);
+    return;
+  }
   setupLevel(1);
   beginIntro(true);
 }
@@ -568,9 +603,9 @@ function updateItems(dt) {
 function startCheckout(lane) {
   G.state = 'checkout'; releaseLock(); setPrompt(null); show('slow', false); C.nitro = 0; show('nitro', false);
   G.lane = lane;
-  const best = bests['L' + G.level];
+  const best = bests[bestKey()];
   G.isRecord = !best || G.time < best;
-  if (G.isRecord) { bests['L' + G.level] = G.time; saveJ('sd_bests', bests); }
+  if (G.isRecord) { bests[bestKey()] = G.time; saveJ('sd_bests', bests); }
   G.co = { t: 0, from: { x: C.x, z: C.z, h: C.h }, h: Math.cos(C.h) < 0 ? PI : 0, camFrom: camera.position.clone(), camQ: camera.quaternion.clone(), next: 0.9, idx: 0, shown: false };
   G.total = 0;
   setCine(true);
@@ -610,7 +645,7 @@ function updateCheckout(dt) {
     $('resT').textContent = G.isRecord ? 'Einkauf erledigt! 🏆' : 'Einkauf erledigt!';
   }
   if (co.shown) {
-    const best = bests['L' + G.level];
+    const best = bests[bestKey()];
     $('resS').innerHTML = `Level ${G.level} · Zeit <b>${fmt(G.time)}</b>${G.isRecord ? ' <span class="rec">NEUER REKORD!</span>' : ' · Bestzeit ' + fmt(best)}<br>${G.list.length} Produkte · Summe <b>${G.total.toFixed(2)} €</b>`;
   }
 }
@@ -911,13 +946,24 @@ for (const [id, fn] of [['sMusic', (v) => (settings.music = v === '1')], ['sQual
     $(id).querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
   });
 }
+function renderWorlds() {
+  const el = $('worldList'); el.innerHTML = '';
+  for (const id of WORLD_ORDER) {
+    const W = WORLDS[id], d = document.createElement('div');
+    d.className = 'world' + (id === selWorld ? ' on' : ''); d.dataset.world = id;
+    let lv = 0; while (bests[(id === 'std' ? '' : id + '_') + 'L' + (lv + 1)] != null) lv++;
+    d.innerHTML = `<div class="pic" style="background:linear-gradient(135deg,${W.grad[0]},${W.grad[1]})">${W.icon}</div><b>${W.name}</b><small>${W.desc}</small><div class="best">${lv ? '🏆 ' + lv + ' Level geschafft' : '&nbsp;'}</div>`;
+    d.addEventListener('click', () => { selWorld = id; SFX.click(); renderWorlds(); });
+    el.appendChild(d);
+  }
+}
 document.addEventListener('click', (e) => {
   const b = e.target.closest('[data-act]'); if (!b) return;
   SFX.init(); SFX.click();
   const act = b.dataset.act, panel = b.closest('.overlay, #result');
   const pid = panel ? panel.id : '';
   switch (act) {
-    case 'play': show('menu', false); show('worlds'); break;
+    case 'play': show('menu', false); renderWorlds(); show('worlds'); break;
     case 'start': startGame(); break;
     case 'settings': openSettings(pid === 'pause' ? 'pause' : 'menu'); if (pid === 'menu') show('menu', false); else show('pause', false); break;
     case 'credits': show('menu', false); show('credits'); break;
@@ -936,5 +982,6 @@ $('pauseBtn').addEventListener('click', (e) => { e.stopPropagation(); SFX.init()
 document.addEventListener('visibilitychange', () => { if (document.hidden && (G.state === 'play' || G.state === 'countdown')) togglePause(); });
 
 // boot
+loadWorld("std");
 showMenu();
 requestAnimationFrame(frame);

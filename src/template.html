@@ -108,6 +108,7 @@
   .world.on { border-color: #ffd21f; background: #363d66; }
   .world .pic { height: 90px; border-radius: 10px; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; font-size: 50px; background: linear-gradient(135deg,#1aa39a,#2a62c9); }
   .world b { font-size: 18px; } .world small { display: block; opacity: .75; margin-top: 3px; font-size: 13px; }
+  .world .best { margin-top: 6px; font-size: 12px; font-weight: 800; color: #ffd21f; }
   .world.locked { cursor: default; filter: grayscale(1); opacity: .55; }
   .world.locked .pic { background: #444a66; }
   .credits { text-align: left; font-size: 15px; line-height: 1.6; }
@@ -194,6 +195,7 @@
 </div>
 <div id="rotate">📱↻<br>Bitte das iPad quer halten</div>
 <div id="count" class="hidden"></div>
+<div id="loading" class="overlay panelWrap hidden"><div class="panel"><h2>🛒 Lade Welt…</h2><div class="sub">Regale werden eingeräumt</div></div></div>
 <div id="barT" class="bar"></div><div id="barB" class="bar"></div>
 <div id="fade"></div>
 
@@ -221,11 +223,7 @@
 <div id="worlds" class="overlay panelWrap hidden">
   <div class="panel">
     <h2>Welt wählen</h2>
-    <div class="worlds">
-      <div class="world on" data-world="std"><div class="pic">🛒</div><b>Drift-Markt</b><small>Der ganz normale Supermarkt um die Ecke.</small></div>
-      <div class="world locked"><div class="pic">🔒</div><b>Baumarkt</b><small>Bald verfügbar…</small></div>
-      <div class="world locked"><div class="pic">🔒</div><b>Mega-Mall</b><small>Bald verfügbar…</small></div>
-      <div class="world locked"><div class="pic">🔒</div><b>Tiefkühl-Lager</b><small>Bald verfügbar…</small></div>
+    <div class="worlds" id="worldList">
     </div>
     <div class="row2"><button class="btn grey" data-act="back">Zurück</button><button class="btn green" data-act="start">Los geht's!</button></div>
   </div>

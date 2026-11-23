@@ -108,6 +108,7 @@
   .world.on { border-color: #ffd21f; background: #363d66; }
   .world .pic { height: 90px; border-radius: 10px; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; font-size: 50px; background: linear-gradient(135deg,#1aa39a,#2a62c9); }
   .world b { font-size: 18px; } .world small { display: block; opacity: .75; margin-top: 3px; font-size: 13px; }
+  .world .best { margin-top: 6px; font-size: 12px; font-weight: 800; color: #ffd21f; }
   .world.locked { cursor: default; filter: grayscale(1); opacity: .55; }
   .world.locked .pic { background: #444a66; }
   .credits { text-align: left; font-size: 15px; line-height: 1.6; }
@@ -194,6 +195,7 @@
 </div>
 <div id="rotate">📱↻<br>Bitte das iPad quer halten</div>
 <div id="count" class="hidden"></div>
+<div id="loading" class="overlay panelWrap hidden"><div class="panel"><h2>🛒 Lade Welt…</h2><div class="sub">Regale werden eingeräumt</div></div></div>
 <div id="barT" class="bar"></div><div id="barB" class="bar"></div>
 <div id="fade"></div>
 
@@ -221,11 +223,7 @@
 <div id="worlds" class="overlay panelWrap hidden">
   <div class="panel">
     <h2>Welt wählen</h2>
-    <div class="worlds">
-      <div class="world on" data-world="std"><div class="pic">🛒</div><b>Drift-Markt</b><small>Der ganz normale Supermarkt um die Ecke.</small></div>
-      <div class="world locked"><div class="pic">🔒</div><b>Baumarkt</b><small>Bald verfügbar…</small></div>
-      <div class="world locked"><div class="pic">🔒</div><b>Mega-Mall</b><small>Bald verfügbar…</small></div>
-      <div class="world locked"><div class="pic">🔒</div><b>Tiefkühl-Lager</b><small>Bald verfügbar…</small></div>
+    <div class="worlds" id="worldList">
     </div>
     <div class="row2"><button class="btn grey" data-act="back">Zurück</button><button class="btn green" data-act="start">Los geht's!</button></div>
   </div>
@@ -385,6 +383,15 @@ function atlasLabel(aspect, draw, big = false, bg = null) {
   return { u0: (x + e) / ATLAS_S, u1: (x + w - e) / ATLAS_S, v0: 1 - (y + h - e) / ATLAS_S, v1: 1 - (y + e) / ATLAS_S };
 }
 
+// remember / rewind the atlas fill level (world switch: world-specific labels are redrawn)
+const atlasMark = () => ({ big: atlasBig, small: atlasSmall });
+function atlasRewind(m) {
+  const g = ATLAS_G; g.fillStyle = '#ffffff';
+  for (let i = m.big; i < atlasBig && i < 32; i++) g.fillRect((i % 8) * 256, Math.floor(i / 8) * 256, 256, 256);
+  for (let i = m.small; i < atlasSmall; i++) { const k = i % 128; if (k === 0) continue; g.fillRect((k % 16) * 128, 1024 + Math.floor(k / 16) * 128, 128, 128); }
+  atlasBig = m.big; atlasSmall = m.small; ATLAS.needsUpdate = true;
+}
+const atlasFree = () => ({ big: 32 - atlasBig, small: 128 - atlasSmall });
 // many tiny labels sharing small atlas cells (e.g. price tags): returns n uv rects
 function atlasSheet(nx, ny, n, draw, bg = '#ffffff') {
   const out = [];
@@ -1066,9 +1073,349 @@ const PRODUCTS = [
 ];
 const PROD = {}; PRODUCTS.forEach((p, i) => { p.idx = i; PROD[p.id] = p; });
 
+// ============================================================
+//  Extra shapes for the other worlds (Baumarkt, Mega-Mall, Tiefkühl-Lager)
+// ============================================================
+Object.assign(SHAPES, {
+  bucket(o, p, s = 1) { // paint bucket with lid + handle
+    const r = 0.08 * s, h = 0.15 * s;
+    o.cyl(r, h, 0, h / 2, 0, p.lab[1], { seg: 12, rt: 1.06 });
+    o.wrap(r * 1.03 + 0.001, h * 0.6, 0, h * 0.5, 0, lab(p, (PI * r) / (h * 0.6)), { seg: 12 });
+    o.cyl(r * 1.08, 0.012, 0, h + 0.006, 0, '#c8ccd0', { seg: 12 });
+    o.cyl(r * 0.7, 0.004, 0, h + 0.014, 0, p.c[0], { seg: 12 }); // paint drip on the lid
+    o.torus(r * 0.98, 0.04, 0, h + 0.01, 0, '#9aa0a6', { rz: PI / 2, arc: PI, seg: 10 });
+    return 2 * r * 1.08 + 0.02;
+  },
+  toolcard(o, p, kind = 'hammer') { // tool on a hanging blister card
+    o.box(0.16, 0.24, 0.01, 0, 0.12, -0.02, p.lab[1]);
+    o.label(0.16, 0.24, 0, 0.12, -0.0145, lab(p, 0.66, true));
+    const [m1, m2] = p.c;
+    if (kind === 'hammer') { o.box(0.025, 0.17, 0.025, 0, 0.1, 0, m2); o.box(0.09, 0.03, 0.03, 0, 0.19, 0, m1); }
+    else if (kind === 'driver') { o.cyl(0.016, 0.08, 0, 0.06, 0, m2, { seg: 8 }); o.cyl(0.005, 0.1, 0, 0.15, 0, m1, { seg: 6 }); }
+    else if (kind === 'pliers') { for (const s of [-1, 1]) { o.box(0.014, 0.1, 0.012, s * 0.02, 0.07, 0, m2, { rz: s * 0.18 }); o.box(0.012, 0.06, 0.012, s * 0.006, 0.15, 0, m1, { rz: -s * 0.1 }); } }
+    else if (kind === 'saw') { o.box(0.04, 0.06, 0.02, 0, 0.05, 0, m2); o.box(0.07, 0.15, 0.004, 0, 0.14, 0, m1); }
+    else { o.box(0.05, 0.12, 0.03, 0, 0.1, 0, m2); }
+    o.box(0.03, 0.02, 0.012, 0, 0.235, -0.02, '#f4f4f4'); // hanger hole
+    return 0.18;
+  },
+  coil(o, p) { // cable drum / extension cord
+    o.cyl(0.11, 0.012, 0, 0.006, 0, p.c[1], { seg: 12 }); o.cyl(0.11, 0.012, 0, 0.13, 0, p.c[1], { seg: 12 });
+    for (let k = 0; k < 4; k++) o.torus(0.075, 0.25, 0, 0.025 + k * 0.028, 0, p.c[0], { rx: PI / 2, seg: 12 });
+    o.cyl(0.03, 0.14, 0, 0.07, 0, '#333', { seg: 8 });
+    o.label(0.1, 0.05, 0, 0.07, 0.106, lab(p, 2));
+    return 0.24;
+  },
+  tape(o, p) { // stack of tape rolls
+    for (let k = 0; k < 3; k++) o.torus(0.045, 0.5, 0, 0.016 + k * 0.032, 0, p.c[0], { rx: PI / 2, seg: 12 });
+    o.label(0.06, 0.03, 0, 0.05, 0.068, lab(p, 2));
+    return 0.13;
+  },
+  pipes(o, p) { // bundle of pipes lying on the shelf
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 2 - (i % 2); j++) o.cyl(0.025, 0.36, (j - 0.5 + (i % 2) * 0.5) * 0.052, 0.025 + i * 0.044, 0, p.c[0], { rx: PI / 2, seg: 8 });
+    o.box(0.12, 0.05, 0.006, 0, 0.05, 0.182, p.lab[1]); o.label(0.12, 0.05, 0, 0.05, 0.186, lab(p, 2.4));
+    return 0.14;
+  },
+  planks(o, p) { // stack of boards (long axis along the shelf front)
+    for (let k = 0; k < 5; k++) o.box(0.5, 0.03, 0.12, (k % 2) * 0.01, 0.015 + k * 0.031, 0, shade(p.c[0], (k % 3) * 0.03 - 0.03));
+    o.box(0.012, 0.16, 0.124, -0.15, 0.08, 0, p.lab[1]); o.box(0.012, 0.16, 0.124, 0.15, 0.08, 0, p.lab[1]); // straps
+    o.label(0.1, 0.05, 0, 0.08, 0.0605, lab(p, 2));
+    return 0.54;
+  },
+  tiles(o, p) { // boxes of tiles with one sample tile in front
+    for (let k = 0; k < 3; k++) o.box(0.3, 0.045, 0.3, 0, 0.0225 + k * 0.046, 0, '#d9c8a8');
+    o.label(0.29, 0.04, 0, 0.115, 0.151, lab(p, 7));
+    o.box(0.13, 0.13, 0.01, 0, 0.21, 0.08, p.c[0], { rx: -0.25 });
+    o.box(0.13, 0.004, 0.012, 0, 0.21, 0.081, shade(p.c[0], -0.2), { rx: -0.25 });
+    return 0.32;
+  },
+  pot(o, p, kind = 'flower') { // plant in a terracotta pot
+    const pc = p.c[1] || '#c8693a';
+    o.cyl(0.07, 0.11, 0, 0.055, 0, pc, { seg: 10, rt: 1.25 });
+    o.cyl(0.09, 0.025, 0, 0.115, 0, shade(pc, -0.08), { seg: 10 });
+    o.cyl(0.08, 0.01, 0, 0.125, 0, '#4a3220', { seg: 10 });
+    const g = p.c[0];
+    if (kind === 'cactus') { o.cyl(0.035, 0.16, 0, 0.2, 0, g, { seg: 8 }); o.sph(0.035, 0, 0.28, 0, g, { seg: 8 }); o.cyl(0.018, 0.06, 0.05, 0.2, 0, g, { seg: 6 }); o.cyl(0.018, 0.05, 0.05, 0.24, 0, g, { seg: 6 }); o.sph(0.012, 0, 0.32, 0, '#ff5aa0', { seg: 5 }); }
+    else if (kind === 'flower') { o.cyl(0.006, 0.16, 0, 0.21, 0, '#3f9b3a', { seg: 4 }); for (let k = 0; k < 6; k++) o.sph(0.022, Math.cos(k) * 0.03, 0.3, Math.sin(k) * 0.03, g, { sy: 0.4, seg: 5 }); o.sph(0.018, 0, 0.305, 0, '#ffd21f', { seg: 5 }); for (const s of [-1, 1]) o.sph(0.03, s * 0.03, 0.18, 0, '#3f9b3a', { sx: 1.4, sy: 0.3, seg: 5 }); }
+    else if (kind === 'bush') { for (let k = 0; k < 6; k++) o.ico(0.05, Math.cos(k * 1.1) * 0.04, 0.2 + (k % 2) * 0.04, Math.sin(k * 1.1) * 0.04, shade(g, (k % 3) * 0.04)); if (p.c[2]) for (let k = 0; k < 4; k++) o.sph(0.016, Math.cos(k * 1.6) * 0.06, 0.2 + (k % 2) * 0.05, Math.sin(k * 1.6) * 0.06, p.c[2], { seg: 5 }); }
+    else if (kind === 'tree') { o.cyl(0.012, 0.12, 0, 0.18, 0, '#6b4226', { seg: 5, rz: 0.2 }); o.ico(0.07, 0.02, 0.27, 0, g, { sy: 0.6 }); o.ico(0.05, -0.04, 0.23, 0.02, shade(g, 0.05), { sy: 0.6 }); }
+    o.label(0.06, 0.03, 0, 0.06, 0.08, lab(p, 2), { rx: -0.1 });
+    return 0.2;
+  },
+  helmet(o, p) {
+    o.sph(0.1, 0, 0.0, 0, p.c[0], { sy: 0.8, seg: 10 });
+    o.cyl(0.11, 0.01, 0, 0.005, 0.01, p.c[0], { seg: 12, sz: 1.15 });
+    o.box(0.02, 0.06, 0.18, 0, 0.07, 0, shade(p.c[0], -0.08));
+    o.box(0.07, 0.03, 0.005, 0, 0.04, 0.095, p.lab[1]); o.label(0.07, 0.03, 0, 0.04, 0.098, lab(p, 2.3), { rx: -0.3 });
+    return 0.24;
+  },
+  lamp(o, p) { // table lamp in its box
+    o.box(0.16, 0.1, 0.12, 0, 0.05, 0, p.lab[1]); o.label(0.16, 0.1, 0, 0.05, 0.061, lab(p, 1.6));
+    o.cyl(0.04, 0.012, 0, 0.106, 0, '#333', { seg: 10 }); o.cyl(0.006, 0.14, 0, 0.18, 0, '#c8ccd0', { seg: 6 });
+    o.cyl(0.07, 0.08, 0, 0.27, 0, p.c[0], { seg: 10, rt: 0.55 });
+    return 0.18;
+  },
+  wcan(o, p) { // watering can
+    o.cyl(0.07, 0.15, 0, 0.075, 0, p.c[0], { seg: 10, sz: 0.8 });
+    o.bar(new V3(0.05, 0.05, 0), new V3(0.16, 0.18, 0), 0.02, p.c[0], true);
+    o.cyl(0.022, 0.025, 0.165, 0.185, 0, shade(p.c[0], -0.1), { seg: 8, rz: -0.8 });
+    o.torus(0.06, 0.15, -0.02, 0.16, 0, p.c[0], { arc: PI, seg: 8 });
+    o.label(0.06, 0.05, -0.01, 0.075, 0.0565, lab(p, 1.2));
+    return 0.26;
+  },
+  bin(o, p) { // bucket / trash bin
+    o.cyl(0.09, 0.2, 0, 0.1, 0, p.c[0], { seg: 12, rt: 1.15 });
+    o.cyl(0.105, 0.015, 0, 0.2, 0, shade(p.c[0], -0.1), { seg: 12 });
+    o.torus(0.09, 0.04, 0, 0.21, 0, '#9aa0a6', { rz: PI / 2, arc: PI, seg: 10 });
+    o.label(0.07, 0.05, 0, 0.1, 0.098, lab(p, 1.4), { rx: -0.07 });
+    return 0.23;
+  },
+  // ---------- mall ----------
+  book(o, p, thick = 0.03) { // books standing, covers to the front
+    const uv = lab(p, 0.13 / 0.19);
+    for (let i = 0; i < 2; i++) {
+      const z = -i * (thick + 0.004);
+      o.box(0.13, 0.19, thick, 0, 0.095, z, p.lab[1]);
+      o.box(0.124, 0.184, thick * 0.9, 0.004, 0.095, z, '#f4efe2');
+      o.label(0.13, 0.19, 0, 0.095, z + thick / 2 + 0.001, uv);
+    }
+    return 0.14;
+  },
+  shoe(o, p) { // pair of sneakers on a box
+    o.box(0.26, 0.06, 0.16, 0, 0.03, 0, p.lab[1]); o.label(0.26, 0.06, 0, 0.03, 0.081, lab(p, 4.3));
+    for (const s of [-1, 1]) {
+      const x = s * 0.06;
+      o.box(0.07, 0.02, 0.2, x, 0.07, 0, p.c[1]);
+      o.box(0.064, 0.04, 0.16, x, 0.1, -0.02, p.c[0]);
+      o.sph(0.035, x, 0.09, 0.07, p.c[0], { sy: 0.65, sz: 1.2, seg: 7 });
+      o.box(0.05, 0.05, 0.05, x, 0.13, -0.07, p.c[0]);
+      o.box(0.068, 0.012, 0.04, x, 0.115, 0.02, shade(p.c[0], -0.25));
+    }
+    return 0.28;
+  },
+  shirt(o, p) { // folded T-shirts in a pile
+    for (let k = 0; k < 3; k++) {
+      const y = 0.015 + k * 0.03;
+      o.box(0.2, 0.028, 0.16, 0, y, 0, p.c[0]);
+      o.box(0.08, 0.03, 0.03, 0, y + 0.002, 0.07, shade(p.c[0], -0.1));
+    }
+    o.label(0.1, 0.06, 0, 0.12, 0.05, lab(p, 1.6), { rx: -PI / 2 + 0.2 });
+    o.box(0.04, 0.012, 0.03, 0.08, 0.1, 0.06, '#ffffff');
+    return 0.22;
+  },
+  headphones(o, p) { // headphones on a stand
+    o.box(0.1, 0.012, 0.08, 0, 0.006, 0, '#222'); o.cyl(0.008, 0.16, 0, 0.09, 0, '#555', { seg: 6 });
+    o.torus(0.065, 0.12, 0, 0.17, 0, p.c[0], { arc: PI, seg: 10 });
+    for (const s of [-1, 1]) { o.cyl(0.038, 0.03, s * 0.068, 0.15, 0, p.c[0], { rz: PI / 2, seg: 10 }); o.cyl(0.03, 0.032, s * 0.068, 0.15, 0, p.c[1], { rz: PI / 2, seg: 10 }); }
+    o.box(0.08, 0.03, 0.004, 0, 0.03, 0.041, p.lab[1]); o.label(0.08, 0.03, 0, 0.03, 0.0435, lab(p, 2.6));
+    return 0.18;
+  },
+  gadget(o, p, w = 0.09, h = 0.15) { // phone / console box with the device standing in front
+    o.box(w, h, 0.04, 0, h / 2, -0.01, p.lab[1]); o.label(w, h, 0, h / 2, 0.0105, lab(p, w / h));
+    return w + 0.02;
+  },
+  mug(o, p) {
+    for (const x of [-0.045, 0.045]) {
+      o.cyl(0.035, 0.08, x, 0.04, 0, p.c[0], { seg: 10 });
+      o.torus(0.022, 0.25, x + 0.04, 0.045, 0, p.c[0], { seg: 8 });
+      o.cyl(0.03, 0.004, x, 0.081, 0, '#3a2412', { seg: 10 });
+      o.wrap(0.0355, 0.04, x, 0.04, 0, lab(p, (PI * 0.035) / 0.04), { seg: 10 });
+    }
+    return 0.19;
+  },
+  pan(o, p) {
+    o.cyl(0.1, 0.035, 0, 0.0175, 0, '#2a2a2a', { seg: 12, rt: 1.1 });
+    o.cyl(0.09, 0.004, 0, 0.034, 0, '#444', { seg: 12 });
+    o.box(0.16, 0.015, 0.025, 0.17, 0.03, 0, p.c[0]);
+    o.box(0.09, 0.05, 0.004, 0, 0.025, 0.112, p.lab[1]); o.label(0.09, 0.05, 0, 0.025, 0.115, lab(p, 1.8));
+    return 0.36;
+  },
+  candle(o, p) {
+    for (const [x, h] of [[-0.035, 0.12], [0.035, 0.09]]) { o.cyl(0.03, h, x, h / 2, 0, p.c[0], { seg: 10 }); o.cyl(0.003, 0.015, x, h + 0.007, 0, '#222', { seg: 4 }); }
+    o.label(0.05, 0.03, -0.035, 0.05, 0.031, lab(p, 1.7));
+    return 0.14;
+  },
+  dumbbell(o, p) {
+    for (const z of [-0.03, 0.03]) { o.cyl(0.012, 0.16, 0, 0.04, z, '#9aa0a6', { rz: PI / 2, seg: 6 }); for (const x of [-0.065, 0.065]) o.cyl(0.04, 0.035, x, 0.04, z, p.c[0], { rz: PI / 2, seg: 8 }); }
+    return 0.2;
+  },
+  matroll(o, p) { o.cyl(0.05, 0.4, 0, 0.05, 0, p.c[0], { rz: PI / 2, seg: 10 }); o.box(0.04, 0.104, 0.104, 0, 0.05, 0, p.lab[1]); o.label(0.1, 0.06, 0, 0.05, 0.053, lab(p, 1.7)); return 0.42; },
+  // ---------- food court ----------
+  burger(o, p) {
+    o.box(0.26, 0.01, 0.16, 0, 0.005, 0, '#e8322b');
+    for (const x of [-0.06, 0.06]) {
+      o.sph(0.05, x, 0.03, 0, '#d99a3e', { sy: 0.35, seg: 9 }); o.cyl(0.052, 0.015, x, 0.045, 0, '#5a3418', { seg: 10 });
+      o.cyl(0.055, 0.006, x, 0.055, 0, '#ffd21f', { seg: 4 }); o.cyl(0.054, 0.006, x, 0.06, 0, '#4fb348', { seg: 10 });
+      o.sph(0.05, x, 0.065, 0, '#d99a3e', { sy: 0.55, seg: 9 }); o.sph(0.004, x + 0.02, 0.09, 0.01, '#fff3c4', { seg: 4 });
+    }
+    return 0.27;
+  },
+  slice(o, p) { // pizza slices on a plate
+    o.cyl(0.11, 0.008, 0, 0.004, 0, '#ffffff', { seg: 12 });
+    for (const r of [0, 2.2]) { o.add(geoCyl(3), Math.cos(r) * 0.03, 0.015, Math.sin(r) * 0.03, 0.07, 0.014, 0.05, '#f2c26a', 0, r, 0); o.add(geoCyl(3), Math.cos(r) * 0.03, 0.022, Math.sin(r) * 0.03, 0.062, 0.004, 0.045, '#d6262b', 0, r, 0); }
+    return 0.24;
+  },
+  donut(o, p) {
+    o.box(0.2, 0.01, 0.12, 0, 0.005, 0, '#f4efe2');
+    for (const x of [-0.05, 0.05]) { o.torus(0.035, 0.6, x, 0.025, 0, '#d99a3e', { rx: PI / 2, seg: 10 }); o.torus(0.035, 0.55, x, 0.032, 0, p.c[0], { rx: PI / 2, seg: 10, sz: 0.5 }); for (let k = 0; k < 4; k++) o.box(0.008, 0.003, 0.003, x + Math.cos(k * 1.6) * 0.035, 0.045, Math.sin(k * 1.6) * 0.035, ['#ffffff', '#4ff2ff', '#ffd21f', '#2bd45a'][k], { ry: k }); }
+    return 0.22;
+  },
+  cup(o, p) { // smoothie / slush cup with lid + straw
+    o.cyl(0.04, 0.14, 0, 0.07, 0, p.c[0], { seg: 10, rt: 1.2 });
+    o.cyl(0.05, 0.012, 0, 0.146, 0, '#f4f4f4', { seg: 10 });
+    o.cyl(0.005, 0.08, 0.01, 0.18, 0, p.c[1] || '#ff4fa8', { seg: 5, rz: 0.15 });
+    o.wrap(0.0465, 0.05, 0, 0.08, 0, lab(p, (PI * 0.046) / 0.05), { seg: 10 });
+    return 0.11;
+  },
+  // ---------- frozen ----------
+  popsicle(o, p) { // box of ice lollies with one on top
+    o.box(0.16, 0.06, 0.1, 0, 0.03, 0, p.lab[1]); o.label(0.16, 0.06, 0, 0.03, 0.051, lab(p, 2.7));
+    o.box(0.04, 0.09, 0.02, 0, 0.11, 0, p.c[0]); o.box(0.012, 0.04, 0.006, 0, 0.05, 0, '#e8c48a');
+    return 0.18;
+  },
+  icebag(o, p) { // bag of ice cubes
+    o.box(0.18, 0.2, 0.08, 0, 0.1, 0, '#e6f7ff');
+    for (let k = 0; k < 9; k++) o.box(0.035, 0.035, 0.035, -0.05 + (k % 3) * 0.05, 0.05 + Math.floor(k / 3) * 0.05, 0.03, '#bfe6ff', { ry: k, rx: k * 0.5 });
+    o.label(0.16, 0.06, 0, 0.17, 0.0415, lab(p, 2.7));
+    return 0.2;
+  },
+  cake(o, p) {
+    o.box(0.2, 0.012, 0.2, 0, 0.006, 0, '#d9d2c4');
+    o.cyl(0.085, 0.07, 0, 0.047, 0, p.c[0], { seg: 12 }); o.cyl(0.087, 0.012, 0, 0.083, 0, p.c[1], { seg: 12 });
+    for (let k = 0; k < 6; k++) o.sph(0.012, Math.cos(k * 1.05) * 0.06, 0.095, Math.sin(k * 1.05) * 0.06, '#d6262b', { seg: 5 });
+    o.label(0.08, 0.035, 0, 0.03, 0.101, lab(p, 2.3));
+    return 0.22;
+  },
+});
+
+// ---- variants: same model, different colors/names (makes the list harder to read!) ----
+const VAR = (prefix, name, shape, base, lab0, variants, ...a) => variants.map(([suf, nm, e, col, price]) =>
+  P(prefix + suf, name + ' ' + nm, e, price, shape, [col, ...base.slice(1)], [lab0[0], col, lab0[2] || '#ffffff', nm], ...a));
+
+PRODUCTS.push(
+  // ======== BAUMARKT ========
+  ...VAR('farbe_', 'Farbe', 'bucket', ['#ffffff'], ['Wandfarbe'], [['w', 'Weiß', '🪣', '#f4f4f4', 19.99], ['r', 'Rot', '🟥', '#d6262b', 24.99], ['b', 'Blau', '🟦', '#2a62c9', 24.99], ['g', 'Gelb', '🟨', '#f2c200', 24.99]]),
+  P('pinsel', 'Pinsel', '🖌️', 3.99, 'toolcard', ['#c8914a', '#b07a45'], ['Malprofi', '#2e8b3a', '#ffffff', 'Pinsel-Set'], 'brush'),
+  P('roller', 'Farbroller', '🧻', 6.99, 'toolcard', ['#f4f4f4', '#e8322b'], ['Malprofi', '#2e8b3a', '#ffffff', 'Farbroller'], 'roller'),
+  P('lackspray', 'Sprühlack', '🎨', 7.49, 'spray', ['#111111', '#e8322b'], ['SPRAY', '#111111', '#ff4fa8', 'schwarz matt']),
+  P('klebeband', 'Klebeband', '🩹', 2.49, 'tape', ['#e8c48a'], ['Abdeckband', '#f2c200', '#1d2230', '50 m']),
+  P('schrauben', 'Schrauben', '🔩', 4.99, 'box', [], ['Fix-Fest', '#2a62c9', '#ffffff', '200 Stück'], 0.12, 0.1, 0.08),
+  P('duebel', 'Dübel', '🔘', 3.99, 'box', [], ['Fix-Fest', '#e8322b', '#ffffff', 'Dübel 6 mm'], 0.12, 0.1, 0.08),
+  P('naegel', 'Nägel', '📌', 2.99, 'box', [], ['Fix-Fest', '#555b66', '#ffd21f', 'Nägel 40 mm'], 0.12, 0.1, 0.08),
+  P('muttern', 'Muttern', '⚙️', 3.49, 'jar', ['#9aa0a6', '#e8322b'], ['Fix-Fest', '#ffffff', '#555b66', 'Muttern M8'], 1.1),
+  P('hammer', 'Hammer', '🔨', 12.99, 'toolcard', ['#555b66', '#c8914a'], ['Werkbank', '#ffd21f', '#1d2230', 'Hammer 500 g'], 'hammer'),
+  P('schraubendreher', 'Schraubenzieher', '🪛', 6.99, 'toolcard', ['#c8ccd0', '#e8322b'], ['Werkbank', '#ffd21f', '#1d2230', 'Schlitz'], 'driver'),
+  P('zange', 'Zange', '🔧', 9.99, 'toolcard', ['#555b66', '#e8322b'], ['Werkbank', '#ffd21f', '#1d2230', 'Kombizange'], 'pliers'),
+  P('saege', 'Säge', '🪚', 14.99, 'toolcard', ['#c8ccd0', '#2e8b3a'], ['Werkbank', '#ffd21f', '#1d2230', 'Fuchsschwanz'], 'saw'),
+  P('gluehbirne', 'Glühbirne', '💡', 3.99, 'box', [], ['Hell!', '#ffd21f', '#1d2230', 'LED 9 W'], 0.08, 0.13, 0.08),
+  P('kabeltrommel', 'Kabeltrommel', '🔌', 29.99, 'coil', ['#ff8a1f', '#1d2230'], ['Volt', '#1d2230', '#ff8a1f', '25 m']),
+  P('verlaengerung', 'Verlängerungskabel', '➰', 9.99, 'coil', ['#f4f4f4', '#555b66'], ['Volt', '#f4f4f4', '#1d2230', '5 m']),
+  P('batterien', 'Batterien', '🔋', 5.99, 'gadget', [], ['Power+', '#1d2230', '#ffd21f', 'AA x8'], 0.1, 0.14),
+  P('akkuschrauber', 'Akkuschrauber', '🪛', 79.99, 'box', [], ['BRUMM', '#2e8b3a', '#ffffff', 'Akkuschrauber'], 0.26, 0.2, 0.1),
+  P('bohrmaschine', 'Bohrmaschine', '🛠️', 89.99, 'box', [], ['BRUMM', '#1f4fb8', '#ffffff', 'Schlagbohrer'], 0.26, 0.2, 0.1),
+  P('schleifer', 'Schleifer', '🌀', 59.99, 'box', [], ['BRUMM', '#e8322b', '#ffffff', 'Schleifer'], 0.26, 0.2, 0.1),
+  P('stichsaege', 'Stichsäge', '⚡', 69.99, 'box', [], ['BRUMM', '#ff8a1f', '#1d2230', 'Stichsäge'], 0.26, 0.2, 0.1),
+  P('wasserhahn', 'Wasserhahn', '🚰', 39.99, 'box', [], ['Aqua', '#5aa9e6', '#ffffff', 'Armatur'], 0.18, 0.18, 0.1),
+  P('duschkopf', 'Duschkopf', '🚿', 19.99, 'box', [], ['Aqua', '#ffffff', '#2a62c9', 'Duschkopf'], 0.14, 0.24, 0.07),
+  P('silikon', 'Silikon', '🧪', 6.49, 'spray', ['#ffffff', '#2a62c9'], ['Dicht!', '#ffffff', '#2a62c9', 'Silikon']),
+  P('rohr', 'Rohre', '🧯', 4.99, 'pipes', ['#9aa0a6'], ['Aqua', '#5aa9e6', '#ffffff', 'Rohr 1 m']),
+  P('blumenerde', 'Blumenerde', '🪴', 4.99, 'sack', [], ['Grün', '#3a2412', '#4fb348', 'Blumenerde 20 L'], 0.22, 0.32),
+  P('rasensamen', 'Rasensamen', '🌱', 9.99, 'box', [], ['Grün', '#4fb348', '#ffffff', 'Rasensamen'], 0.15, 0.22, 0.08),
+  P('duenger', 'Dünger', '🧂', 7.99, 'sack', [], ['Grün', '#2e8b3a', '#ffd21f', 'Dünger'], 0.16, 0.24),
+  P('giesskanne', 'Gießkanne', '🚿', 8.99, 'wcan', ['#2e8b3a'], ['Grün', '#ffffff', '#2e8b3a', '10 L']),
+  P('bretter', 'Bretter', '🪵', 12.99, 'planks', ['#d9a253'], ['Holz', '#e8322b', '#ffffff', 'Fichte']),
+  P('leisten', 'Leisten', '📏', 5.99, 'planks', ['#e8c48a'], ['Holz', '#2a62c9', '#ffffff', 'Leisten']),
+  P('holzleim', 'Holzleim', '🧴', 4.99, 'flask', ['#ffffff', '#ff8a1f'], ['Leim', '#ff8a1f', '#ffffff', 'Holzleim']),
+  P('spanplatte', 'Spanplatte', '🟫', 14.99, 'planks', ['#c8a070'], ['Holz', '#555b66', '#ffffff', 'Spanplatte']),
+  ...VAR('fliese_', 'Fliesen', 'tiles', ['#ffffff'], ['Fliesen'], [['w', 'Weiß', '⬜', '#f4f4f4', 19.99], ['b', 'Blau', '🟦', '#5aa9e6', 22.99], ['t', 'Terracotta', '🟫', '#c8693a', 24.99]]),
+  P('fliesenkleber', 'Fliesenkleber', '🧱', 12.99, 'sack', [], ['Fix-Fest', '#9aa0a6', '#1d2230', 'Kleber 25 kg'], 0.22, 0.32),
+  P('helm', 'Schutzhelm', '⛑️', 14.99, 'helmet', ['#ffd21f'], ['Safe', '#1d2230', '#ffd21f', '']),
+  P('handschuhe', 'Arbeitshandschuhe', '🧤', 4.99, 'bag', [], ['Safe', '#ff8a1f', '#1d2230', 'Größe 10'], 0.13, 0.2),
+  P('schutzbrille', 'Schutzbrille', '🥽', 6.99, 'gadget', [], ['Safe', '#1d2230', '#4ff2ff', 'Schutzbrille'], 0.14, 0.12),
+  P('warnweste', 'Warnweste', '🦺', 3.99, 'bag', [], ['Safe', '#f2ff3a', '#ff8a1f', 'Warnweste'], 0.16, 0.22),
+  P('tischlampe', 'Tischlampe', '🛋️', 24.99, 'lamp', ['#ffd21f'], ['Lumen', '#1d2230', '#ffd21f', 'Tischlampe']),
+  P('lichterkette', 'Lichterkette', '✨', 9.99, 'box', [], ['Lumen', '#1d2230', '#ffd21f', 'Lichterkette'], 0.16, 0.12, 0.08),
+  P('taschenlampe', 'Taschenlampe', '🔦', 12.99, 'gadget', [], ['Lumen', '#ffd21f', '#1d2230', 'Taschenlampe'], 0.09, 0.18),
+  P('solarlampe', 'Solarleuchte', '☀️', 7.99, 'gadget', [], ['Lumen', '#2a62c9', '#ffd21f', 'Solar'], 0.09, 0.2),
+  P('eimer', 'Eimer', '🪣', 3.49, 'bin', ['#2a62c9'], ['Eimer', '#ffffff', '#2a62c9', '10 L']),
+  P('muelleimer', 'Mülleimer', '🗑️', 14.99, 'bin', ['#555b66'], ['Clean', '#ffffff', '#555b66', '30 L']),
+  P('kleister', 'Tapetenkleister', '📜', 5.99, 'box', [], ['Fix-Fest', '#ffffff', '#2a62c9', 'Kleister'], 0.12, 0.18, 0.06),
+  P('tapete', 'Tapete', '🎞️', 11.99, 'matroll', ['#f4efe2'], ['Deko', '#b34fe0', '#ffffff', 'Tapete']),
+  P('kaktus', 'Kaktus', '🌵', 4.99, 'pot', ['#3f9b3a', '#c8693a'], ['Grün', '#ffffff', '#3f9b3a', ''], 'cactus'),
+  P('blume', 'Blumentopf', '🌷', 3.99, 'pot', ['#ff4fa8', '#c8693a'], ['Grün', '#ffffff', '#ff4fa8', ''], 'flower'),
+  P('tomatenpflanze', 'Tomatenpflanze', '🍅', 2.99, 'pot', ['#3f9b3a', '#2e2e2e', '#e8322b'], ['Grün', '#ffffff', '#e8322b', ''], 'bush'),
+  P('bonsai', 'Bonsai', '🌳', 19.99, 'pot', ['#2f8a2f', '#3a6a8a'], ['Grün', '#ffffff', '#2f8a2f', ''], 'tree'),
+  P('kraeuter', 'Kräuter', '🌿', 1.99, 'pot', ['#4fb348', '#c8693a'], ['Grün', '#ffffff', '#4fb348', ''], 'bush'),
+  P('lavendel', 'Lavendel', '💜', 3.49, 'pot', ['#4fb348', '#f4efe2', '#8a6bd6'], ['Grün', '#ffffff', '#8a6bd6', ''], 'bush'),
+  P('zement', 'Zement', '🏗️', 6.99, 'sack', [], ['BAU', '#9aa0a6', '#e8322b', 'Zement 25 kg'], 0.26, 0.34),
+  P('kies', 'Kies', '🪨', 4.99, 'sack', [], ['BAU', '#c8b89a', '#1d2230', 'Kies 25 kg'], 0.26, 0.34),
+  P('rigips', 'Gipsplatte', '⬜', 9.99, 'planks', ['#f4f4f4'], ['BAU', '#2a62c9', '#ffffff', 'Gips']),
+  P('kantholz', 'Kantholz', '🪵', 8.99, 'planks', ['#b97b3a'], ['Holz', '#2e8b3a', '#ffffff', 'Kantholz']),
+  // ======== MEGA-MALL ========
+  P('kopfhoerer', 'Kopfhörer', '🎧', 49.99, 'headphones', ['#1d2230', '#e8322b'], ['BASS', '#1d2230', '#e8322b', 'Wireless']),
+  P('handy', 'Handy', '📱', 299, 'gadget', [], ['Pling', '#1d2230', '#4ff2ff', 'Phone 9'], 0.09, 0.16),
+  P('konsole', 'Spielkonsole', '🎮', 399, 'gadget', [], ['ZOCK', '#ffffff', '#e8322b', 'Konsole'], 0.24, 0.18),
+  P('ladekabel', 'Ladekabel', '🔌', 9.99, 'gadget', [], ['Pling', '#ffffff', '#1d2230', 'USB-C'], 0.09, 0.16),
+  ...VAR('tshirt_', 'T-Shirt', 'shirt', ['#ffffff'], ['FASHION'], [['r', 'Rot', '👕', '#d6262b', 14.99], ['b', 'Blau', '👕', '#2a62c9', 14.99], ['s', 'Schwarz', '👕', '#1d2230', 14.99]]),
+  P('jeans', 'Jeans', '👖', 39.99, 'shirt', ['#3a5a9a'], ['DENIM', '#3a5a9a', '#ffffff', 'Slim Fit']),
+  P('sneaker_w', 'Sneaker Weiß', '👟', 79.99, 'shoe', ['#f4f4f4', '#e8322b'], ['ZOOM', '#1d2230', '#ffffff', 'Weiß']),
+  P('sneaker_r', 'Sneaker Rot', '👟', 79.99, 'shoe', ['#d6262b', '#ffffff'], ['ZOOM', '#1d2230', '#ff6a6a', 'Rot']),
+  P('stiefel', 'Stiefel', '🥾', 99.99, 'shoe', ['#6b4226', '#2a2a2a'], ['Trail', '#c8914a', '#1d2230', 'Stiefel']),
+  P('flipflops', 'Flip-Flops', '🩴', 9.99, 'shoe', ['#4ff2ff', '#ff8a1f'], ['Beach', '#ffd21f', '#2a62c9', 'Flip-Flops']),
+  P('basketball', 'Basketball', '🏀', 24.99, 'ball', ['#e87a1f', '#2a2a2a'], ['Ball', '#e87a1f', '#2a2a2a', '']),
+  P('hanteln', 'Hanteln', '🏋️', 29.99, 'dumbbell', ['#e8322b'], ['FIT', '#1d2230', '#e8322b', '2 x 2 kg']),
+  P('yogamatte', 'Yogamatte', '🧘', 19.99, 'matroll', ['#8a6bd6'], ['FIT', '#1d2230', '#8a6bd6', 'Yogamatte']),
+  P('trinkflasche', 'Trinkflasche', '🍶', 12.99, 'bottle', ['#4ff2ff', '#1d2230'], ['FIT', '#1d2230', '#4ff2ff', '1 L'], 1.2),
+  ...VAR('buch_', 'Buch', 'book', ['#ffffff'], ['Verlag'], [['k', '„Kochen“', '📕', '#d6262b', 19.99], ['c', '„Comic“', '📗', '#2bd45a', 9.99], ['r', '„Krimi“', '📘', '#1d2230', 12.99], ['a', '„Atlas“', '📙', '#ff8a1f', 24.99]]),
+  P('parfuem', 'Parfüm', '🌸', 59.99, 'flask', ['#ffb3d9', '#c8a050'], ['Rosé', '#ffb3d9', '#8a3a5a', 'Eau de Parfum'], 0.9),
+  P('lippenstift', 'Lippenstift', '💄', 14.99, 'gadget', [], ['Glam', '#1d2230', '#ff4f8a', 'Rouge'], 0.07, 0.12),
+  P('nagellack', 'Nagellack', '💅', 7.99, 'jar', ['#ff4f8a', '#1d2230'], ['Glam', '#ffffff', '#ff4f8a', 'Pink'], 0.7),
+  P('creme_m', 'Gesichtscreme', '🧴', 19.99, 'jar', ['#f4f4f4', '#c8a050'], ['Glow', '#f4f4f4', '#c8a050', 'Tagescreme'], 1.0),
+  P('tasse', 'Tassen', '☕', 9.99, 'mug', ['#ffffff'], ['Home', '#ffffff', '#e8322b', 'I ♥ Drift']),
+  P('pfanne', 'Pfanne', '🍳', 29.99, 'pan', ['#1d2230'], ['Koch', '#e8322b', '#ffffff', '28 cm']),
+  P('kerzen', 'Kerzen', '🕯️', 6.99, 'candle', ['#f4efe2'], ['Home', '#f4efe2', '#b07a45', 'Vanille']),
+  P('bilderrahmen', 'Bilderrahmen', '🖼️', 12.99, 'gadget', [], ['Home', '#c8a070', '#1d2230', '13 x 18'], 0.16, 0.2),
+  P('vinyl', 'Schallplatte', '💿', 24.99, 'book', ['#ffffff'], ['Beats', '#1d2230', '#ff4fa8', 'Drift Hits'], 0.008),
+  P('gitarre', 'Ukulele', '🎸', 39.99, 'gadget', [], ['Musik', '#c8914a', '#1d2230', 'Ukulele'], 0.14, 0.3),
+  P('sonnenbrille', 'Sonnenbrille', '🕶️', 29.99, 'gadget', [], ['Cool', '#1d2230', '#ffd21f', 'UV 400'], 0.14, 0.1),
+  P('uhr', 'Armbanduhr', '⌚', 89.99, 'gadget', [], ['Tick', '#1d2230', '#c8ccd0', 'Sport'], 0.1, 0.1),
+  P('rucksack', 'Rucksack', '🎒', 34.99, 'bag', [], ['Trail', '#e8322b', '#1d2230', 'Rucksack'], 0.2, 0.28),
+  P('muetze', 'Mütze', '🧢', 14.99, 'helmet', ['#2a62c9'], ['FASHION', '#ffffff', '#2a62c9', '']),
+  P('burger', 'Burger', '🍔', 6.99, 'burger', [], ['Burger', '#e8322b', '#ffd21f', '']),
+  P('pizzastueck', 'Pizzastück', '🍕', 3.49, 'slice', [], ['Pizza', '#2e8b3a', '#ffffff', '']),
+  P('donut', 'Donuts', '🍩', 2.49, 'donut', ['#ff7eb6'], ['Donut', '#ff7eb6', '#ffffff', '']),
+  P('smoothie', 'Smoothie', '🥤', 4.99, 'cup', ['#ff6a8a', '#4fb348'], ['Fresh', '#ffffff', '#ff6a8a', 'Beere']),
+  P('slush', 'Slush-Eis', '🧊', 2.99, 'cup', ['#4fb0ff', '#ff4fa8'], ['BRRR', '#ffffff', '#2a62c9', 'Blau']),
+  P('popcorn_m', 'Kino-Popcorn', '🍿', 4.99, 'cup', ['#ffd21f', '#e8322b'], ['KINO', '#e8322b', '#ffffff', 'XXL'], 1),
+  // ======== TIEFKÜHL-LAGER ========
+  ...VAR('eis_', 'Eis', 'tub', [], ['Eiskalt'], [['v', 'Vanille', '🍨', '#fff3c4', 3.49], ['s', 'Schoko', '🍫', '#7a4a22', 3.49], ['m', 'Minze', '🌿', '#9ff2c8', 3.49]]),
+  P('eisstiel', 'Eis am Stiel', '🍡', 2.99, 'popsicle', ['#ff4f8a'], ['Frosty', '#4fb0ff', '#ffffff', '6 Stück']),
+  ...VAR('tkpizza_', 'TK-Pizza', 'pizza', [], ['Pizzeria'], [['m', 'Margherita', '🍕', '#e8322b', 2.49], ['t', 'Thunfisch', '🐟', '#2a62c9', 2.99], ['s', 'Spinat', '🥬', '#2e8b3a', 2.99]]),
+  ...VAR('tkgemuese_', 'TK-', 'bag', [], ['Frost'], [['e', 'Erbsen', '🫛', '#4fb348', 1.49], ['s', 'Spinat', '🥬', '#1d6f3a', 1.69], ['m', 'Mischgemüse', '🥕', '#ff8a1f', 1.99]], 0.16, 0.22),
+  P('lachs', 'Lachsfilet', '🍣', 6.99, 'box', [], ["Käpt'n", '#ff8a6a', '#ffffff', 'Lachs'], 0.2, 0.05, 0.14),
+  P('garnelen', 'Garnelen', '🦐', 7.99, 'bag', [], ["Käpt'n", '#2a62c9', '#ff8a6a', 'Garnelen'], 0.16, 0.2),
+  P('hack', 'Hackfleisch', '🥩', 4.49, 'tray', ['#c8504a'], ['Metzger', '#c8261b', '#ffffff', '']),
+  P('patties', 'Burger-Patties', '🍔', 5.49, 'box', [], ['Grill', '#3a2412', '#ffd21f', '4 Patties'], 0.2, 0.06, 0.14),
+  P('nuggets', 'Chicken Nuggets', '🍗', 3.99, 'box', [], ['Crispy', '#ffd21f', '#e8322b', 'Nuggets'], 0.2, 0.06, 0.14),
+  P('fruehlingsrollen', 'Frühlingsrollen', '🥟', 3.49, 'box', [], ['Asia', '#e8322b', '#ffd21f', '8 Stück'], 0.2, 0.06, 0.14),
+  P('tkbroetchen', 'TK-Brötchen', '🥯', 2.29, 'bag', [], ['Back', '#c8914a', '#ffffff', '10 Stück'], 0.18, 0.22),
+  P('kroketten', 'Kroketten', '🥔', 2.49, 'bag', [], ['Frost', '#ffd21f', '#6b4226', 'Kroketten'], 0.18, 0.24),
+  P('roesti', 'Rösti', '🥔', 2.29, 'box', [], ['Frost', '#e8c48a', '#6b4226', 'Rösti'], 0.2, 0.06, 0.14),
+  P('lasagne', 'Lasagne', '🍝', 3.99, 'box', [], ['Nonna', '#c8261b', '#ffffff', 'Lasagne'], 0.2, 0.07, 0.14),
+  P('asiapfanne', 'Asia-Pfanne', '🍜', 3.49, 'bag', [], ['Asia', '#1d2230', '#ff8a1f', 'Wok'], 0.18, 0.24),
+  P('eiswuerfel', 'Eiswürfel', '🧊', 1.29, 'icebag', [], ['BRRR', '#2a62c9', '#ffffff', '2 kg']),
+  P('torte', 'Torte', '🎂', 8.99, 'cake', ['#fff3c4', '#ff7eb6'], ['Konditor', '#ff7eb6', '#ffffff', 'Erdbeer']),
+  P('tiramisu', 'Tiramisu', '🍰', 4.49, 'cake', ['#7a4a22', '#e8c48a'], ['Dolce', '#7a4a22', '#ffffff', 'Tiramisu']),
+  ...VAR('beeren_', 'TK-', 'bag', [], ['Frost'], [['b', 'Beeren', '🫐', '#3a3aa0', 2.99], ['e', 'Erdbeeren', '🍓', '#e8322b', 2.79], ['m', 'Mango', '🥭', '#ffb400', 3.29]], 0.16, 0.22),
+);
+PRODUCTS.forEach((p, i) => { p.idx = i; PROD[p.id] = p; });
+
 // build each product's geometry once (shared by shelves, the cart and the checkout)
-function buildProductGeos() {
-  for (const p of PRODUCTS) {
+function buildProductGeos(list = PRODUCTS) {
+  for (const p of PRODUCTS) { // forget the previous world's labels/geometries
+    p.labs = null; p.mainLab = null; p.mainAspect = null;
+    for (const k of ['geo', 'geoMid', 'geoLo']) if (p[k]) { p[k].dispose(); p[k] = null; }
+  }
+  for (const p of list) {
     const o = new Obj();
     p.w = SHAPES[p.shape](o, p, ...p.a);
     p.geo = objGeo(o);
@@ -1089,6 +1436,7 @@ function buildProductGeos() {
     p.geoLo = objGeo(lo);
     // medium detail: simple silhouette + printed label
     const ROUND = ['bottle', 'can', 'jar', 'spray', 'tub', 'squeeze', 'flatcan'];
+    const FLAT = ['box', 'sack', 'bag', 'gadget', 'carton', 'tube', 'soap', 'sponge', 'flask', 'bar', 'butter', 'pizza', 'cups', 'tp'];
     const ORGANIC = ['duck', 'ball', 'teddy', 'croissant', 'loaf', 'baguette', 'crateOf', 'wheel', 'salami', 'tray', 'eggs', 'toast', 'bone', 'toycar', 'crate'];
     if (ROUND.includes(p.shape)) {
       const m = new Obj(), r = Math.min(bw, p.d) / 2 * 0.98, body = p.shape === 'bottle' || p.shape === 'jar' ? p.c[0] : p.lab[1];
@@ -1102,13 +1450,134 @@ function buildProductGeos() {
       }
       if (p.mainLab) { const lh = Math.min(p.h * 0.5, (PI * r) / p.mainAspect); m.wrap(r * 1.02, lh, cx, p.shape === 'bottle' ? p.h * 0.36 : p.h * 0.45, cz, p.mainLab, { seg: 7 }); }
       p.geoMid = objGeo(m);
-    } else if (ORGANIC.includes(p.shape)) {
+    } else if (ORGANIC.includes(p.shape) || !FLAT.includes(p.shape)) {
       SEGCAP = 6; SKIP_TINY = true;
       const m = new Obj(); SHAPES[p.shape](m, p, ...p.a);
       SEGCAP = 99; SKIP_TINY = false;
       p.geoMid = objGeo(m);
     } else p.geoMid = p.geoLo;
   }
+}
+
+// ============================================================
+//  Shopping Drifters – the worlds (all share the same floor plan, but look,
+//  products, shelving and physics differ)
+// ============================================================
+const S = (n, e, col, t) => ({ n, e, col, t });
+const WORLDS = {
+  // ---------------------------------------------------------------- Drift-Markt
+  std: {
+    id: 'std', name: 'Drift-Markt', logo: 'DRIFT-MARKT', short: ['DRIFT', 'MARKT'],
+    H: 5.6, wall: '#f1ece0', band: '#1aa39a', kick: '#8a8f99', ceil: '#cfccc4', facade: '#e9e2d0',
+    floor: { a: '#ece8df', b: '#e2ddd2', grout: '#cfc9bd', tile: 2 },
+    fog: ['#e9e4d8', 28, 75], light: { hemi: ['#ffffff', '#b3a58e', 1.55], sun: ['#fff4e2', 1.5], bg: '#a9d8ff' },
+    shelf: 'gondola', grip: 1,
+    sections: [
+      [S('Getränke', '🥤', '#2a62c9', ['cola', 'wasser', 'limo', 'energy']), S('Säfte & Kisten', '🧃', '#ff8a1f', ['osaft', 'asaft', 'eistee', 'kiste'])],
+      [S('Süßes', '🍬', '#e0408a', ['schoko', 'gummi', 'kekse', 'lolli']), S('Snacks', '🍿', '#e8322b', ['chips', 'popcorn', 'nuesse', 'salzst'])],
+      [S('Frühstück', '🥣', '#e0a019', ['muesli', 'honig', 'marmelade', 'creme']), S('Backwaren', '🥖', '#b07a45', ['brot', 'toast', 'croissant', 'baguette'])],
+      [S('Nudeln & Reis', '🍝', '#1f4fb8', ['spaghetti', 'fusilli', 'reis', 'tomsauce']), S('Konserven', '🥫', '#c8261b', ['mais', 'bohnen', 'thunfisch', 'ravioli'])],
+      [S('Backen & Würzen', '🧂', '#8a6bd6', ['mehl', 'zucker', 'salz', 'ketchup']), S('Spielzeug', '🧸', '#ffb400', ['ente', 'fussball', 'teddy', 'auto'])],
+      [S('Haushalt', '🧻', '#2e9b8a', ['klopapier', 'kuechenrolle', 'spueli', 'schwamm']), S('Drogerie', '🧴', '#b34fe0', ['zahnpasta', 'shampoo', 'seife', 'deo'])],
+      [S('Tierbedarf', '🐾', '#5a9e2e', ['katzenfutter', 'hundefutter', 'knochen', 'vogelfutter']), S('Kaffee & Tee', '☕', '#6b4226', ['kaffee', 'tee', 'kakao', 'espresso'])],
+    ],
+    back: { style: 'cooler', tag: 'KÜHLREGAL', units: [
+      { x0: -28.5, x1: -10, n: 'Milch & Käse', e: '🥛', col: '#2a7de1', t: ['milch', 'kaese', 'joghurt', 'butter', 'eier'] },
+      { x0: -9, x1: 9, n: 'Wurst & Fleisch', e: '🥩', col: '#c8261b', t: ['salami', 'wuerstchen', 'haehnchen', 'schinken'] },
+      { x0: 10, x1: 28.5, n: 'Tiefkühl', e: '❄️', col: '#5ac8f0', t: ['pizza', 'eis', 'pommes', 'fischst'] },
+    ] },
+    front: { style: 'produce', n: 'Obst & Gemüse', e: '🍎', sub: 'FRISCH', col: '#3f9b3a', items: [[10, 'aepfel', 'tomaten'], [17, 'bananen', 'karotten'], [24, 'melone', 'brokkoli']] },
+    candy: ['schoko', 'gummi', 'lolli', 'kekse', 'salzst'],
+    posters: [['ANGEBOT', '-50%', '#e8322b'], ['NEU', 'Drift-Cola', '#2a62c9'], ['BITTE', 'Nicht driften!', '#f2a20c'], ['SUPER', 'Frisch!', '#3f9b3a']],
+    desc: 'Der ganz normale Supermarkt um die Ecke.', icon: '🛒', grad: ['#1aa39a', '#2a62c9'],
+  },
+  // ---------------------------------------------------------------- Baumarkt
+  bau: {
+    id: 'bau', name: 'Baumarkt', logo: 'BAU-DRIFT', short: ['BAU', 'DRIFT'],
+    H: 6.8, wall: '#e6e2d6', band: '#ff7a00', kick: '#555b66', ceil: '#8a8f99', facade: '#d9d4c4',
+    floor: { a: '#b9b6ae', b: '#b3b0a8', grout: '#8f8c85', tile: 4 },
+    fog: ['#d8d4c8', 30, 80], light: { hemi: ['#ffffff', '#9a9488', 1.5], sun: ['#ffffff', 1.4], bg: '#a9d8ff' },
+    shelf: 'rack', grip: 1,
+    sections: [
+      [S('Farben', '🪣', '#d6262b', ['farbe_w', 'farbe_r', 'farbe_b', 'farbe_g']), S('Malerbedarf', '🖌️', '#e0408a', ['pinsel', 'roller', 'lackspray', 'klebeband'])],
+      [S('Schrauben', '🔩', '#555b66', ['schrauben', 'duebel', 'naegel', 'muttern']), S('Werkzeug', '🔨', '#ffb400', ['hammer', 'schraubendreher', 'zange', 'saege'])],
+      [S('Elektro', '🔌', '#1d2230', ['gluehbirne', 'kabeltrommel', 'verlaengerung', 'batterien']), S('Maschinen', '🛠️', '#2e8b3a', ['akkuschrauber', 'bohrmaschine', 'schleifer', 'stichsaege'])],
+      [S('Sanitär', '🚿', '#2a7de1', ['wasserhahn', 'duschkopf', 'silikon', 'rohr']), S('Garten', '🌱', '#3f9b3a', ['blumenerde', 'rasensamen', 'duenger', 'giesskanne'])],
+      [S('Holz', '🪵', '#b07a45', ['bretter', 'leisten', 'holzleim', 'spanplatte']), S('Fliesen', '🧱', '#c8693a', ['fliese_w', 'fliese_b', 'fliese_t', 'fliesenkleber'])],
+      [S('Arbeitsschutz', '⛑️', '#f2c200', ['helm', 'handschuhe', 'schutzbrille', 'warnweste']), S('Licht', '💡', '#8a6bd6', ['tischlampe', 'lichterkette', 'taschenlampe', 'solarlampe'])],
+      [S('Tapezieren', '🎞️', '#2e9b8a', ['eimer', 'muelleimer', 'kleister', 'tapete']), S('Putzen', '🧽', '#1aa39a', ['klopapier', 'kuechenrolle', 'spueli', 'schwamm'])],
+    ],
+    back: { style: 'open', tag: 'BAUSTOFFE', frame: '#ff7a00', units: [
+      { x0: -28.5, x1: -1, n: 'Baustoffe', e: '🏗️', col: '#555b66', t: ['zement', 'kies'] },
+      { x0: 1, x1: 28.5, n: 'Holzzuschnitt', e: '🪵', col: '#b07a45', t: ['kantholz', 'rigips'] },
+    ] },
+    front: { style: 'produce', n: 'Gartencenter', e: '🪴', sub: 'PFLANZEN', col: '#3f9b3a', items: [[10, 'kaktus', 'blume'], [17, 'tomatenpflanze', 'bonsai'], [24, 'kraeuter', 'lavendel']] },
+    candy: ['batterien', 'klebeband', 'handschuhe', 'gluehbirne', 'schrauben'],
+    posters: [['PROFI', 'Werkzeug', '#ff7a00'], ['NEU', 'Akku-Power', '#2e8b3a'], ['ACHTUNG', 'Stapler!', '#f2c200'], ['DIY', 'Selbst bauen!', '#2a62c9']],
+    desc: 'Hohe Regale, Paletten, Gabelstapler-Feeling.', icon: '🔨', grad: ['#ff7a00', '#555b66'],
+  },
+  // ---------------------------------------------------------------- Mega-Mall
+  mall: {
+    id: 'mall', name: 'Mega-Mall', logo: 'DRIFT-MALL', short: ['DRIFT', 'MALL'],
+    H: 9, wall: '#f6f1ea', band: '#b34fe0', kick: '#3a3f4a', ceil: '#f4f1ea', facade: '#ece6dc', skylight: true,
+    floor: { a: '#f4f1ec', b: '#d9d2c8', grout: '#c9a96a', tile: 3 },
+    fog: ['#f1ece4', 35, 90], light: { hemi: ['#fffaf0', '#c8b8a0', 1.7], sun: ['#fff8ec', 1.6], bg: '#9fd4ff' },
+    shelf: 'shop', grip: 1,
+    sections: [
+      [S('Elektronik', '🎧', '#1d2230', ['kopfhoerer', 'handy', 'konsole', 'ladekabel']), S('Mode', '👕', '#e0408a', ['tshirt_r', 'tshirt_b', 'tshirt_s', 'jeans'])],
+      [S('Schuhe', '👟', '#e8322b', ['sneaker_w', 'sneaker_r', 'stiefel', 'flipflops']), S('Sport', '🏀', '#ff8a1f', ['basketball', 'hanteln', 'yogamatte', 'trinkflasche'])],
+      [S('Bücher', '📚', '#2a62c9', ['buch_k', 'buch_c', 'buch_r', 'buch_a']), S('Parfümerie', '🌸', '#ff7eb6', ['parfuem', 'lippenstift', 'nagellack', 'creme_m'])],
+      [S('Wohnen', '🕯️', '#b07a45', ['tasse', 'pfanne', 'kerzen', 'bilderrahmen']), S('Musik & Style', '🎸', '#8a6bd6', ['vinyl', 'gitarre', 'sonnenbrille', 'uhr'])],
+      [S('Spielwaren', '🧸', '#ffb400', ['ente', 'teddy', 'auto', 'fussball']), S('Süßwaren', '🍭', '#e0408a', ['schoko', 'gummi', 'lolli', 'popcorn'])],
+      [S('Kiosk', '🗞️', '#2e9b8a', ['cola', 'energy', 'chips', 'salzst']), S('Reise', '🎒', '#1aa39a', ['rucksack', 'muetze', 'wasser', 'nuesse'])],
+      [S('Zoohandlung', '🐾', '#5a9e2e', ['katzenfutter', 'hundefutter', 'knochen', 'vogelfutter']), S('Café', '☕', '#6b4226', ['kaffee', 'tee', 'kakao', 'croissant'])],
+    ],
+    back: { style: 'cooler', tag: 'FEINKOST', frame: '#c9a96a', units: [
+      { x0: -28.5, x1: -10, n: 'Feinkost', e: '🧀', col: '#c9a96a', t: ['kaese', 'salami', 'creme', 'espresso'] },
+      { x0: -9, x1: 9, n: 'Kühl-Bar', e: '🥛', col: '#2a7de1', t: ['milch', 'joghurt', 'osaft', 'asaft'] },
+      { x0: 10, x1: 28.5, n: 'Eis-Café', e: '🍨', col: '#ff7eb6', t: ['eis', 'torte', 'tiramisu', 'eistee'] },
+    ] },
+    front: { style: 'food', n: 'Food-Court', e: '🍔', sub: 'SNACKS', col: '#e8322b', items: [[10, 'burger', 'pizzastueck'], [17, 'donut', 'smoothie'], [24, 'slush', 'popcorn_m']] },
+    candy: ['schoko', 'gummi', 'lolli', 'kopfhoerer', 'ladekabel'],
+    posters: [['SALE', '-70%', '#e8322b'], ['NEU', 'Phone 9', '#1d2230'], ['KINO', 'Drift Movie', '#8a6bd6'], ['FOOD', 'Burger!', '#ff8a1f']],
+    fountain: true,
+    desc: 'Riesig, glänzend, mit Brunnen und Food-Court.', icon: '🛍️', grad: ['#b34fe0', '#ff7eb6'],
+  },
+  // ---------------------------------------------------------------- Tiefkühl-Lager
+  frost: {
+    id: 'frost', name: 'Tiefkühl-Lager', logo: 'FROST-LAGER', short: ['FROST', 'LAGER'],
+    H: 6, wall: '#e6f2fb', band: '#4fb0ff', kick: '#3a5a7a', ceil: '#a9c2d4', facade: '#dfeaf2',
+    floor: { a: '#d6ecf6', b: '#c4e0ee', grout: '#a9c8da', tile: 2 },
+    fog: ['#d6ebf7', 18, 60], light: { hemi: ['#eaf6ff', '#8fb0c8', 1.6], sun: ['#e6f4ff', 1.3], bg: '#cfe8ff' },
+    shelf: 'freezer', grip: 0.55, ice: true,
+    sections: [
+      [S('Eiscreme', '🍨', '#ff7eb6', ['eis_v', 'eis_s', 'eis_m', 'eisstiel']), S('Pizza', '🍕', '#e8322b', ['tkpizza_m', 'tkpizza_t', 'tkpizza_s', 'pizza'])],
+      [S('TK-Gemüse', '🥦', '#3f9b3a', ['tkgemuese_e', 'tkgemuese_s', 'tkgemuese_m']), S('Fisch', '🐟', '#2a62c9', ['fischst', 'lachs', 'garnelen', 'thunfisch'])],
+      [S('Fleisch', '🥩', '#c8261b', ['hack', 'patties', 'nuggets', 'haehnchen']), S('Kartoffel', '🍟', '#ffb400', ['pommes', 'kroketten', 'roesti'])],
+      [S('Backwaren', '🥐', '#b07a45', ['tkbroetchen', 'croissant', 'brot', 'baguette']), S('Fertiggerichte', '🍝', '#8a6bd6', ['lasagne', 'asiapfanne', 'fruehlingsrollen', 'ravioli'])],
+      [S('Desserts', '🎂', '#ff7eb6', ['torte', 'tiramisu', 'eis', 'donut']), S('TK-Obst', '🫐', '#3a3aa0', ['beeren_b', 'beeren_e', 'beeren_m', 'smoothie'])],
+      [S('Eis & Drinks', '🧊', '#4fb0ff', ['eiswuerfel', 'slush', 'wasser', 'energy']), S('Molkerei', '🥛', '#2a7de1', ['milch', 'butter', 'joghurt', 'kaese'])],
+      [S('Wurst & Eier', '🥓', '#c8504a', ['salami', 'wuerstchen', 'schinken', 'eier']), S('Snacks', '🍿', '#e8322b', ['chips', 'popcorn', 'nuesse', 'salzst'])],
+    ],
+    back: { style: 'cooler', tag: 'KÜHLHAUS', frame: '#7a9ab0', units: [
+      { x0: -28.5, x1: -1, n: 'Kühlhaus A', e: '❄️', col: '#2a7de1', t: ['kiste', 'eistee', 'kekse', 'creme'] },
+      { x0: 1, x1: 28.5, n: 'Kühlhaus B', e: '🧊', col: '#4fb0ff', t: ['muesli', 'honig', 'marmelade', 'toast'] },
+    ] },
+    front: { style: 'chest', n: 'Aktions-Truhen', e: '🧊', sub: 'ANGEBOTE', col: '#4fb0ff', items: [[10, 'cola', 'limo'], [17, 'schoko', 'gummi'], [24, 'asaft', 'osaft']] },
+    candy: ['schoko', 'gummi', 'lolli', 'eisstiel', 'kekse'],
+    posters: [['KALT!', '-25 °C', '#4fb0ff'], ['ACHTUNG', 'Glatteis!', '#e8322b'], ['NEU', 'Frost-Eis', '#ff7eb6'], ['TIPP', 'Jacke an!', '#2a62c9']],
+    desc: 'Eiskalt und spiegelglatt – überall rutschig!', icon: '🧊', grad: ['#4fb0ff', '#bfe6ff'],
+  },
+};
+const WORLD_ORDER = ['std', 'bau', 'mall', 'frost'];
+// every product id a world uses (geometry + labels are built for exactly these)
+function worldProductIds(W) {
+  const ids = new Set();
+  for (const col of W.sections) for (const s of col) s.t.forEach((t) => ids.add(t));
+  for (const u of W.back.units) u.t.forEach((t) => ids.add(t));
+  for (const [, a, b] of W.front.items) { ids.add(a); ids.add(b); }
+  W.candy.forEach((t) => ids.add(t));
+  return [...ids];
 }
 
 // ============================================================
@@ -1128,23 +1597,24 @@ const AISLES = [];
   for (let i = 0; i < 7; i++) AISLES.push({ x0: xs[i * 2], x1: xs[i * 2 + 1], cx: (xs[i * 2] + xs[i * 2 + 1]) / 2 });
 }
 
-// [aisle][half] → category
-const SECTIONS = [
-  [{ n: 'Getränke', e: '🥤', col: '#2a62c9', t: ['cola', 'wasser', 'limo', 'energy'] }, { n: 'Säfte & Kisten', e: '🧃', col: '#ff8a1f', t: ['osaft', 'asaft', 'eistee', 'kiste'] }],
-  [{ n: 'Süßes', e: '🍬', col: '#e0408a', t: ['schoko', 'gummi', 'kekse', 'lolli'] }, { n: 'Snacks', e: '🍿', col: '#e8322b', t: ['chips', 'popcorn', 'nuesse', 'salzst'] }],
-  [{ n: 'Frühstück', e: '🥣', col: '#e0a019', t: ['muesli', 'honig', 'marmelade', 'creme'] }, { n: 'Backwaren', e: '🥖', col: '#b07a45', t: ['brot', 'toast', 'croissant', 'baguette'] }],
-  [{ n: 'Nudeln & Reis', e: '🍝', col: '#1f4fb8', t: ['spaghetti', 'fusilli', 'reis', 'tomsauce'] }, { n: 'Konserven', e: '🥫', col: '#c8261b', t: ['mais', 'bohnen', 'thunfisch', 'ravioli'] }],
-  [{ n: 'Backen & Würzen', e: '🧂', col: '#8a6bd6', t: ['mehl', 'zucker', 'salz', 'ketchup'] }, { n: 'Spielzeug', e: '🧸', col: '#ffb400', t: ['ente', 'fussball', 'teddy', 'auto'] }],
-  [{ n: 'Haushalt', e: '🧻', col: '#2e9b8a', t: ['klopapier', 'kuechenrolle', 'spueli', 'schwamm'] }, { n: 'Drogerie', e: '🧴', col: '#b34fe0', t: ['zahnpasta', 'shampoo', 'seife', 'deo'] }],
-  [{ n: 'Tierbedarf', e: '🐾', col: '#5a9e2e', t: ['katzenfutter', 'hundefutter', 'knochen', 'vogelfutter'] }, { n: 'Kaffee & Tee', e: '☕', col: '#6b4226', t: ['kaffee', 'tee', 'kakao', 'espresso'] }],
-];
+// [aisle][half] → category (set per world)
+let SECTIONS = WORLDS.std.sections;
+let CUR_WORLD = WORLDS.std;
+let WORLD_IDS = [];
 const SPOTS = {};       // productId → pickup spot
 const LANES = [];       // checkout lanes
 const STORE_ANIM = {};
-const PRODUCT_LOD = []; // per product type: detailed + simple instanced mesh  // things that animate (doors, lane lamps, …)
+const PRODUCT_LOD = []; // product chunks with 3 levels of detail
 
-function buildStore(scene) {
+function buildStore(scene, W) {
   rng = mulberry32(42);
+  // reset everything the previous world left behind
+  COLS.length = 0; LANES.length = 0; PRODUCT_LOD.length = 0;
+  for (const k in SPOTS) delete SPOTS[k];
+  for (const p of PRODUCTS) p.section = null;
+  CUR_WORLD = W; SECTIONS = W.sections; STORE.H = W.H;
+  WORLD_IDS = worldProductIds(W);
+  const unknown = WORLD_IDS.filter((id) => !PROD[id]); if (unknown.length) console.warn('unknown products', unknown);
   const acc = new MeshAcc();      // shelves, counters … (cast shadows)
   const flat = new MeshAcc();     // walls, deco without shadow casting
   const inst = PRODUCTS.map(() => []);
@@ -1152,30 +1622,34 @@ function buildStore(scene) {
 
   // ---------- floor & ceiling ----------
   const tileTex = canvasTex(256, 256, (g, w, h) => {
-    g.fillStyle = '#cfc9bd'; g.fillRect(0, 0, w, h);
-    const cs = ['#ece8df', '#e2ddd2'];
+    g.fillStyle = W.floor.grout; g.fillRect(0, 0, w, h);
+    const cs = [W.floor.a, W.floor.b];
     for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) { g.fillStyle = cs[(i + j) % 2]; g.fillRect(i * 128 + 3, j * 128 + 3, 122, 122); }
   });
-  tileTex.wrapS = tileTex.wrapT = T.RepeatWrapping; tileTex.repeat.set(30, 25);
+  tileTex.wrapS = tileTex.wrapT = T.RepeatWrapping; tileTex.repeat.set(60 / (W.floor.tile * 2), 50 / (W.floor.tile * 2));
+  if (W.ice) { const g = tileTex.userData.ctx; g.globalAlpha = 0.35; g.strokeStyle = '#ffffff'; g.lineWidth = 2; for (let i = 0; i < 14; i++) { g.beginPath(); const x = Math.random() * 256, y = Math.random() * 256; g.moveTo(x, y); g.lineTo(x + 30 - Math.random() * 60, y + 30 - Math.random() * 60); g.stroke(); } g.globalAlpha = 1; tileTex.needsUpdate = true; }
   const floor = new T.Mesh(new T.PlaneGeometry(60, 50), new T.MeshLambertMaterial({ map: tileTex }));
   floor.rotation.x = -PI / 2; floor.position.set(0, 0, 25); floor.receiveShadow = true; scene.add(floor);
   // colored walkway stripe from the entrance
-  const stripe = new T.Mesh(new T.PlaneGeometry(2.2, 10), new T.MeshLambertMaterial({ color: '#1aa39a' }));
+  const stripe = new T.Mesh(new T.PlaneGeometry(2.2, 10), new T.MeshLambertMaterial({ color: W.band }));
   stripe.rotation.x = -PI / 2; stripe.position.set(0, 0.004, 5); stripe.receiveShadow = true; scene.add(stripe);
   const outside = new T.Mesh(new T.PlaneGeometry(300, 300), new T.MeshLambertMaterial({ color: '#6f747c' }));
   outside.rotation.x = -PI / 2; outside.position.set(0, -0.02, 0); outside.receiveShadow = true; scene.add(outside);
 
-  const ceil = new T.Mesh(new T.PlaneGeometry(60, 50), new T.MeshLambertMaterial({ color: '#cfccc4' }));
+  const ceil = new T.Mesh(new T.PlaneGeometry(60, 50), new T.MeshLambertMaterial({ color: W.ceil }));
   ceil.rotation.x = PI / 2; ceil.position.set(0, STORE.H, 25); scene.add(ceil);
   const lampAcc = new MeshAcc();
   const lampObj = new Obj();
   for (const a of AISLES) for (let z = 3; z < 49; z += 4.5) lampObj.box(0.5, 0.06, 2.6, a.cx, STORE.H - 0.05, z, '#ffffff');
   for (const g of [-8, 8]) for (let z = 3; z < 12; z += 4) lampObj.box(3, 0.06, 0.5, g, STORE.H - 0.05, z, '#ffffff');
+  if (W.skylight) for (let x = -24; x <= 24; x += 12) for (let z = 8; z <= 44; z += 12) lampObj.box(8, 0.05, 8, x, STORE.H - 0.03, z, '#ffffff');
   lampAcc.addObj(lampObj);
-  scene.add(lampAcc.build(new T.MeshBasicMaterial({ color: '#fffdf2' })));
+  const lampMat = new T.MeshBasicMaterial({ color: W.skylight ? '#dff1ff' : W.ice ? '#e6f6ff' : '#fffdf2' });
+  STORE_ANIM.lampMat = lampMat; STORE_ANIM.lampCol = lampMat.color.clone();
+  scene.add(lampAcc.build(lampMat));
 
   // ---------- walls ----------
-  const wallC = '#f1ece0', bandC = '#1aa39a', kickC = '#8a8f99';
+  const wallC = W.wall, bandC = W.band, kickC = W.kick;
   const wo = new Obj();
   const wall = (x0, z0, x1, z1) => {
     const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, w = Math.abs(x1 - x0) || 0.4, d = Math.abs(z1 - z0) || 0.4;
@@ -1194,12 +1668,12 @@ function buildStore(scene) {
   const ex = new Obj();
   ex.box(61.2, 0.5, 51.2, 0, STORE.H + 0.35, 25, '#9aa0a8'); // roof (kept above the ceiling plane → no z-fighting)
   for (const sx of [-1, 1]) {
-    ex.box(27.7, 6.6, 0.3, sx * 16.85, 3.3, -0.55, '#e9e2d0');
-    ex.box(2, 6.65, 0.4, sx * 4, 3.3, -0.6, '#1aa39a');
+    ex.box(27.7, STORE.H + 1, 0.3, sx * 16.85, (STORE.H + 1) / 2, -0.55, W.facade);
+    ex.box(2, STORE.H + 1.05, 0.4, sx * 4, (STORE.H + 1) / 2, -0.6, W.band);
     ex.box(27.7, 0.6, 0.4, sx * 16.85, 0.3, -0.62, '#7b808a');
     ex.box(0.25, 3.1, 0.5, sx * 3.1, 1.55, -0.6, '#2e3440');
   }
-  ex.box(6, 3.6, 0.4, 0, 4.8, -0.6, '#1aa39a');
+  ex.box(6, STORE.H - 2, 0.4, 0, 3 + (STORE.H - 2) / 2, -0.6, W.band);
   ex.box(6.4, 0.25, 0.5, 0, 3.1, -0.6, '#2e3440');
   for (let x = -26; x <= 26; x += 6.5) if (Math.abs(x) > 6) ex.box(4.6, 2.2, 0.1, x, 2.0, -0.72, '#8fc6e8');
   flat.addObj(ex);
@@ -1220,13 +1694,13 @@ function buildStore(scene) {
 
   // facade logo
   const logoTex = canvasTex(1024, 256, (g, w, h) => {
-    g.fillStyle = '#1aa39a'; g.fillRect(0, 0, w, h);
+    g.fillStyle = W.band; g.fillRect(0, 0, w, h);
     g.font = `900 120px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.fillStyle = '#7a2e0b'; g.fillText('DRIFT-MARKT', w / 2 + 6, h / 2 + 8);
-    g.fillStyle = '#ffe066'; g.fillText('DRIFT-MARKT', w / 2, h / 2);
+    g.fillStyle = '#7a2e0b'; g.fillText(W.logo, w / 2 + 6, h / 2 + 8);
+    g.fillStyle = '#ffe066'; g.fillText(W.logo, w / 2, h / 2);
   });
   const logo = new T.Mesh(new T.PlaneGeometry(9, 2.25), new T.MeshBasicMaterial({ map: logoTex }));
-  logo.position.set(0, 4.6, -0.82); logo.rotation.y = PI; scene.add(logo);
+  logo.position.set(0, Math.min(STORE.H - 1, 5.2), -0.82); logo.rotation.y = PI; scene.add(logo);
 
   // sliding doors
   const glassMat = new T.MeshLambertMaterial({ color: '#bfe6ff', transparent: true, opacity: 0.35, depthWrite: false });
@@ -1236,8 +1710,15 @@ function buildStore(scene) {
   STORE_ANIM.doors = { L: doorL, R: doorR, open: 0 };
 
   // ---------- shelves ----------
-  const shelfC = '#d9dde2', backC = '#c3c8cf', baseC = '#4b5160', boardC = '#eef0f2';
+  const SH = {
+    gondola: { shelf: '#d9dde2', back: '#c3c8cf', base: '#4b5160', board: '#eef0f2', up: '#aab1ba' },
+    rack: { shelf: '#ff7a00', back: '#9aa0a6', base: '#3a3f4a', board: '#c8ccd0', up: '#ff7a00' },
+    shop: { shelf: '#f4efe6', back: '#fbf8f2', base: '#2a2d35', board: '#c8a070', up: '#c9a96a' },
+    freezer: { shelf: '#e6f2fb', back: '#cfe3f2', base: '#3a5a7a', board: '#f4f9fc', up: '#9fb8cc' },
+  }[W.shelf];
+  const shelfC = SH.shelf, backC = SH.back, baseC = SH.base, boardC = SH.board;
   const so = new Obj();
+  const glassAcc = new MeshAcc();
   const priceStrip = (x, y, z0, z1, sideX) => so.box(0.012, 0.05, z1 - z0, x + sideX * 0.006, y - 0.02, (z0 + z1) / 2, '#fdf6c9');
   const secLabel = (sec, num) => sec.hdr || (sec.hdr = atlasLabel(6.2, (g, x, y, w, h) => {
     g.fillStyle = sec.col; g.fillRect(x, y, w, h);
@@ -1254,8 +1735,9 @@ function buildStore(scene) {
     fitText(g, '-' + (10 + (p.idx * 7) % 40) + '%', x + w * 0.26, y + h * 0.7, w * 0.44, h * 0.4);
     g.font = `${h * 0.7}px ${EMOJI_FONT}`; g.fillText(p.e, x + w * 0.78, y + h * 0.54);
   }, false, '#ffd84a');
-  const pickPromo = () => { let p; do p = PRODUCTS[RI(0, PRODUCTS.length - 1)]; while (p.shape === 'crateOf'); return p; };
-  function upright(x, z, h) { so.box(0.05, h, 0.05, x, h / 2, z, '#aab1ba'); for (let y = 0.2; y < h - 0.1; y += 0.12) so.box(0.052, 0.04, 0.012, x, y, z, '#5a606c'); }
+  const promoPool = WORLD_IDS.map((id) => PROD[id]).filter((p) => p.shape !== 'crateOf');
+  const pickPromo = () => pick(promoPool);
+  function upright(x, z, h) { so.box(0.05, h, 0.05, x, h / 2, z, SH.up); for (let y = 0.2; y < h - 0.1; y += 0.12) so.box(0.052, 0.04, 0.012, x, y, z, '#5a606c'); }
   function gondola(gi, hf) {
     const gx = GONDOLA_X[gi], [za, zb] = HALVES[hf], L = zb - za, cz = (za + zb) / 2;
     so.box(1.5, 0.12, L - 0.2, gx, 0.06, cz, baseC);
@@ -1274,6 +1756,7 @@ function buildStore(scene) {
       for (const f of [0.25, 0.75]) so.label(1.7, 0.26, gx + s * 0.801, 2.15, za + 0.6 + (L - 1.2) * f, secLabel(sec, num), { ry: s * PI / 2 });
     }
     for (const z of [za + 0.6, zb - 0.6]) { so.box(1.6, 2.2, 0.06, gx, 1.1, z, shelfC); for (const s of [-1, 1]) upright(gx + s * 0.77, z, 2.3); }
+    styleExtras(gx, za + 0.6, zb - 0.6, true);
     // end caps with promo pyramids + posters
     for (const [z, dir] of [[za + 0.3, -1], [zb - 0.3, 1]]) {
       const p = pickPromo();
@@ -1288,6 +1771,35 @@ function buildStore(scene) {
     addCol(gx - 0.8, za, gx + 0.8, zb);
   }
   const endcaps = [];
+  // world specific shelving details (heavy-duty racks, freezer glass, shop lights)
+  function styleExtras(x, z0, z1, both, side = 0) {
+    const L = z1 - z0, cz = (z0 + z1) / 2, sides = both ? [-1, 1] : [side];
+    if (W.shelf === 'rack') {
+      const n = Math.round(L / 3);
+      for (let k = 0; k <= n; k++) for (const s of sides) so.box(0.09, 3.5, 0.09, x + s * 0.76, 1.75, z0 + (k * L) / n, '#ff7a00');
+      for (const s of sides) for (const y of [1.9, 2.5, 3.45]) so.box(0.06, 0.12, L, x + s * 0.76, y, cz, '#1f4fb8');
+      const dx = both ? x : x + side * 0.46;
+      so.box(both ? 1.5 : 0.6, 0.04, L, dx, 2.56, cz, '#c8ccd0');
+      for (let k = 0; k < Math.floor(L / 1.4); k++) { // pallets with boxes on top
+        const z = z0 + 0.7 + k * 1.4;
+        so.box(both ? 1.2 : 0.55, 0.12, 1.1, dx, 2.64, z, '#b88a50');
+        const hgt = 0.3 + ((k * 7) % 3) * 0.15;
+        so.box(both ? 1.1 : 0.5, hgt, 1.0, dx, 2.7 + hgt / 2, z, ['#c8914a', '#b97b3a', '#d9a253'][k % 3]);
+        so.box(both ? 1.12 : 0.52, 0.05, 1.02, dx, 2.7 + hgt * 0.6, z, '#e8c48a');
+      }
+    } else if (W.shelf === 'freezer') {
+      for (const s of sides) {
+        const xf = x + s * 0.82, nd = Math.max(1, Math.round(L / 1.1));
+        for (let i = 0; i <= nd; i++) so.box(0.07, 2.0, 0.06, xf, 1.0, z0 + (i * L) / nd, '#9fb8cc');
+        for (let i = 0; i < nd; i++) { glassAcc.addObj(new Obj().box(0.02, 1.85, L / nd - 0.07, xf, 1.0, z0 + ((i + 0.5) * L) / nd, '#ffffff')); so.box(0.05, 0.45, 0.03, xf + s * 0.03, 1.1, z0 + ((i + 0.8) * L) / nd, '#cfd6dc'); }
+        so.box(0.1, 0.08, L, xf, 2.02, cz, '#9fb8cc');
+        for (let i = 0; i < 6; i++) so.box(0.06, 0.03 + (i % 2) * 0.02, 0.12, xf + s * 0.02, 1.98 - (i % 3) * 0.02, z0 + (i + 0.5) * (L / 6), '#ffffff'); // frost
+        for (const lv of SHELF_LEVELS) so.box(0.03, 0.012, L, x + s * 0.74, lv + 0.38, cz, '#e6fbff'); // LEDs
+      }
+    } else if (W.shelf === 'shop') {
+      for (const s of sides) { so.box(0.04, 0.03, L, x + s * 0.76, 2.0, cz, '#c9a96a'); for (let k = 0; k < Math.floor(L / 1.5); k++) so.cyl(0.05, 0.06, x + s * 0.7, 1.95, z0 + 0.75 + k * 1.5, '#fff6d8', { seg: 8 }); }
+    }
+  }
   function wallShelf(xFront, s, hf) { // s = direction into the aisle (+1 left wall, -1 right wall)
     const [za, zb] = HALVES[hf], a = s > 0 ? 0 : 6, sec = SECTIONS[a][hf];
     const L = zb - za, cz = (za + zb) / 2, xb = xFront - s * 0.3;
@@ -1297,6 +1809,7 @@ function buildStore(scene) {
     so.box(0.62, 0.32, L, xb, 2.35, cz, sec.col);
     for (const f of [0.2, 0.5, 0.8]) so.label(1.9, 0.29, xFront + s * 0.011, 2.35, za + L * f, secLabel(sec, hf * 7 + a + 1), { ry: s * PI / 2 });
     for (let z = za; z <= zb + 0.01; z += L / 4) upright(xFront - s * 0.03, z, 2.5);
+    styleExtras(xFront - s * 0.76, za, zb, false, s);
     addCol(Math.min(xFront, xFront - s * 0.6), za, Math.max(xFront, xFront - s * 0.6), zb);
   }
   // faces (tagOff = where the price tags sit relative to the face line)
@@ -1317,16 +1830,12 @@ function buildStore(scene) {
   // gaps between wall shelves & back/front: fill wall shelves only along the halves; cross aisle stays open
 
   // ---------- back-wall coolers ----------
-  const coolers = [
-    { x0: -28.5, x1: -10, n: 'Milch & Käse', e: '🥛', col: '#2a7de1', t: ['milch', 'kaese', 'joghurt', 'butter', 'eier'] },
-    { x0: -9, x1: 9, n: 'Wurst & Fleisch', e: '🥩', col: '#c8261b', t: ['salami', 'wuerstchen', 'haehnchen', 'schinken'] },
-    { x0: 10, x1: 28.5, n: 'Tiefkühl', e: '❄️', col: '#5ac8f0', t: ['pizza', 'eis', 'pommes', 'fischst'] },
-  ];
-  const glassAcc = new MeshAcc();
+  const coolers = W.back.units;
+  const coolerGlass = W.back.style === 'cooler', frameC = W.back.frame || '#9aa3ad';
   for (const c of coolers) {
     const L = c.x1 - c.x0, cx = (c.x0 + c.x1) / 2, zc = (COOLER_Z + 50) / 2, dz = 50 - COOLER_Z;
     so.box(L, 0.2, dz, cx, 0.1, zc, '#3c4250');
-    so.box(L, 2.3, 0.05, cx, 1.15, 49.95, '#e6f2fb');
+    so.box(L, 2.3, 0.05, cx, 1.15, 49.95, coolerGlass ? '#e6f2fb' : W.shelf === 'rack' ? '#9aa0a6' : '#fbf8f2');
     so.box(L, 0.25, dz, cx, 2.42, zc, c.col);
     for (const lv of [0.25, 0.7, 1.15, 1.6]) {
       so.box(L, 0.03, dz - 0.2, cx, lv - 0.015, zc + 0.1, '#f4f7fa');
@@ -1335,10 +1844,10 @@ function buildStore(scene) {
     }
     for (let k = 0; k < 4; k++) so.box(L - 0.1, 0.012, 0.01, cx, 0.05 + k * 0.035, COOLER_Z - 0.005, '#20242c'); // vent grille
     so.box(L, 0.08, 0.1, cx, 2.25, COOLER_Z - 0.03, '#9aa3ad');
-    const nd = Math.round(L / 1.0);
+    const nd = Math.round(L / (coolerGlass ? 1.0 : 3.0));
     const go = new Obj();
-    for (let i = 0; i <= nd; i++) so.box(0.06, 2.2, 0.08, c.x0 + (i * L) / nd, 1.2, COOLER_Z - 0.02, '#9aa3ad');
-    for (let i = 0; i < nd; i++) { go.box(L / nd - 0.06, 2.0, 0.02, c.x0 + ((i + 0.5) * L) / nd, 1.2, COOLER_Z - 0.03, '#ffffff'); so.box(0.03, 0.5, 0.05, c.x0 + ((i + 0.85) * L) / nd, 1.2, COOLER_Z - 0.09, '#cfd6dc'); }
+    for (let i = 0; i <= nd; i++) so.box(coolerGlass ? 0.06 : 0.1, 2.2, 0.08, c.x0 + (i * L) / nd, 1.2, COOLER_Z - 0.02, frameC);
+    if (coolerGlass) for (let i = 0; i < nd; i++) { go.box(L / nd - 0.06, 2.0, 0.02, c.x0 + ((i + 0.5) * L) / nd, 1.2, COOLER_Z - 0.03, '#ffffff'); so.box(0.03, 0.5, 0.05, c.x0 + ((i + 0.85) * L) / nd, 1.2, COOLER_Z - 0.09, '#cfd6dc'); }
     glassAcc.addObj(go);
     addCol(c.x0, COOLER_Z, c.x1, 50.4);
     faces.push({ ax: c.x1 - 0.2, az: COOLER_Z, bx: c.x0 + 0.2, bz: COOLER_Z, nx: 0, nz: -1, types: c.t, tagOff: -0.188, levels: [0.25, 0.7, 1.15, 1.6].map((y) => ({ y, inset: 0.4 })) });
@@ -1347,14 +1856,35 @@ function buildStore(scene) {
   const glass = glassAcc.build(new T.MeshLambertMaterial({ color: '#cfeeff', transparent: true, opacity: 0.22, depthWrite: false }));
   glass.renderOrder = 2;
   scene.add(glass);
-  // gaps between the coolers
-  so.box(1, 2.4, 1.2, -9.5, 1.2, 49.4, '#c3c8cf'); so.box(1, 2.4, 1.2, 9.5, 1.2, 49.4, '#c3c8cf');
-  addCol(-10, COOLER_Z, -9, 50); addCol(9, COOLER_Z, 10, 50);
+  // gaps between the back units
+  for (let i = 0; i + 1 < coolers.length; i++) {
+    const g0 = coolers[i].x1, g1 = coolers[i + 1].x0;
+    so.box(g1 - g0, 2.4, 1.2, (g0 + g1) / 2, 1.2, 49.4, '#c3c8cf'); addCol(g0, COOLER_Z, g1, 50);
+  }
 
-  // ---------- produce tables ----------
-  const produce = [[10, 'aepfel', 'tomaten'], [17, 'bananen', 'karotten'], [24, 'melone', 'brokkoli']];
+  // ---------- front area (produce / garden / food court / freezer chests) ----------
+  const chalk = (p) => atlasLabel(1.4, (g, x0, y0, w, h) => {
+    g.fillStyle = '#2b2b2b'; g.fillRect(x0, y0, w, h); g.fillStyle = '#ffffff'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = `${h * 0.4}px ${EMOJI_FONT}`; g.fillText(p.e, x0 + w * 0.22, y0 + h * 0.36);
+    fitText(g, p.n, x0 + w * 0.62, y0 + h * 0.34, w * 0.55, h * 0.24, 700, '"Chalkboard SE", "Comic Sans MS", cursive');
+    g.fillStyle = '#ffd84a'; fitText(g, p.price.toFixed(2).replace('.', ',') + ' €', x0 + w / 2, y0 + h * 0.74, w * 0.8, h * 0.34, 900, '"Chalkboard SE", "Comic Sans MS", cursive');
+  }, false, '#2b2b2b');
+  const produce = W.front.items, fst = W.front.style;
   for (const [tx, a, b] of produce) {
-    const za = 4.5, zb = 9.5, cz = 7, wood = '#a8703e', dark = '#7a4a26';
+    const za = 4.5, zb = 9.5, cz = 7;
+    const wood = fst === 'food' ? '#f4f4f4' : '#a8703e', dark = fst === 'food' ? '#e8322b' : '#7a4a26';
+    if (fst === 'chest') { // freezer chests with glass lids
+      so.box(1.6, 0.8, 5, tx, 0.4, cz, '#f4f9fc'); so.box(1.62, 0.1, 5.02, tx, 0.05, cz, '#3a5a7a');
+      so.box(1.62, 0.06, 5.02, tx, 0.82, cz, '#9fb8cc'); so.box(0.06, 0.1, 5, tx, 0.88, cz, '#9fb8cc');
+      for (const s of [-1, 1]) glassAcc.addObj(new Obj().box(0.72, 0.02, 4.9, tx + s * 0.38, 0.86, cz, '#ffffff', { rz: s * 0.08 }));
+      for (let k = 0; k < 8; k++) so.box(0.2, 0.02, 0.3, tx + (k % 2 ? 0.5 : -0.5), 0.84, za + 0.4 + k * 0.6, '#ffffff'); // frost
+      so.label(1.0, 0.26, tx, 0.45, zb + 0.012, chalk(PROD[a]), {});
+      faces.push({ ax: tx - 0.82, az: zb, bx: tx - 0.82, bz: za, nx: -1, nz: 0, types: [a], tagOff: null, levels: [{ y: 0.45, inset: 0.38 }] });
+      faces.push({ ax: tx + 0.82, az: za, bx: tx + 0.82, bz: zb, nx: 1, nz: 0, types: [b], tagOff: null, levels: [{ y: 0.45, inset: 0.38 }] });
+      addCol(tx - 0.82, za, tx + 0.82, zb);
+      PROD[a].section = PROD[b].section = W.front.n;
+      continue;
+    }
     for (const sx of [-0.7, 0.7]) for (const sz of [za + 0.15, cz, zb - 0.15]) so.box(0.08, 0.66, 0.08, tx + sx, 0.33, sz, dark); // legs
     for (const sx of [-1, 1]) for (let k = 0; k < 3; k++) so.box(0.03, 0.12, 5, tx + sx * 0.74, 0.18 + k * 0.17, cz, k % 2 ? wood : shade(wood, -0.06)); // side planks
     so.box(1.4, 0.04, 4.9, tx, 0.12, cz, dark);
@@ -1362,34 +1892,31 @@ function buildStore(scene) {
     so.box(0.4, 0.14, 5, tx, 0.79, cz, dark);
     so.box(0.06, 1.6, 0.06, tx, 1.3, za + 0.1, '#6b4226'); so.box(0.06, 1.6, 0.06, tx, 1.3, zb - 0.1, '#6b4226');
     // little awning on top
-    for (let k = 0; k < 8; k++) so.box(0.9, 0.04, 5.3 / 8, tx, 2.1, za - 0.15 + (k + 0.5) * (5.3 / 8), k % 2 ? '#ffffff' : '#3f9b3a', { rz: 0 });
-    for (const sx of [-1, 1]) so.box(0.45, 0.03, 5.3, tx + sx * 0.4, 2.02, cz, '#3f9b3a', { rz: sx * -0.35 });
+    const awn = fst === 'food' ? '#e8322b' : '#3f9b3a';
+    for (let k = 0; k < 8; k++) so.box(0.9, 0.04, 5.3 / 8, tx, 2.1, za - 0.15 + (k + 0.5) * (5.3 / 8), k % 2 ? '#ffffff' : awn, { rz: 0 });
+    for (const sx of [-1, 1]) so.box(0.45, 0.03, 5.3, tx + sx * 0.4, 2.02, cz, awn, { rz: sx * -0.35 });
     // chalkboard price signs on sticks
     for (const [id, nx] of [[a, -1], [b, 1]]) {
       const p = PROD[id], x = tx + nx * 0.62;
       so.box(0.02, 0.5, 0.02, x, 1.0, cz, '#6b4226');
       so.box(0.36, 0.27, 0.025, x, 1.3, cz, '#8a5a32', { ry: PI / 2 });
-      so.label(0.32, 0.23, x + nx * 0.014, 1.3, cz, atlasLabel(1.4, (g, x0, y0, w, h) => {
-        g.fillStyle = '#2b2b2b'; g.fillRect(x0, y0, w, h); g.fillStyle = '#ffffff'; g.textAlign = 'center'; g.textBaseline = 'middle';
-        g.font = `${h * 0.4}px ${EMOJI_FONT}`; g.fillText(p.e, x0 + w * 0.22, y0 + h * 0.36);
-        fitText(g, p.n, x0 + w * 0.62, y0 + h * 0.34, w * 0.55, h * 0.24, 700, '"Chalkboard SE", "Comic Sans MS", cursive');
-        g.fillStyle = '#ffd84a'; fitText(g, p.price.toFixed(2).replace('.', ',') + ' €', x0 + w / 2, y0 + h * 0.74, w * 0.8, h * 0.34, 900, '"Chalkboard SE", "Comic Sans MS", cursive');
-      }, false, '#2b2b2b'), { ry: nx * PI / 2 });
+      so.label(0.32, 0.23, x + nx * 0.014, 1.3, cz, chalk(p), { ry: nx * PI / 2 });
     }
     faces.push({ ax: tx - 0.85, az: zb, bx: tx - 0.85, bz: za, nx: -1, nz: 0, types: [a], tagOff: 0.0, levels: [{ y: 0.72, inset: 0.2 }] });
     faces.push({ ax: tx + 0.85, az: za, bx: tx + 0.85, bz: zb, nx: 1, nz: 0, types: [b], tagOff: 0.0, levels: [{ y: 0.72, inset: 0.2 }] });
     addCol(tx - 0.85, za, tx + 0.85, zb);
-    PROD[a].section = PROD[b].section = 'Obst & Gemüse';
+    PROD[a].section = PROD[b].section = W.front.n;
   }
 
   // ---------- checkouts ----------
   const counterXs = [-27, -21, -15, -9];
-  const candy = ['schoko', 'gummi', 'lolli', 'kekse', 'salzst'];
+  const candy = W.candy;
+  const bagLabel = atlasLabel(1.25, (g, x, y, w, h) => { g.fillStyle = '#f4f4f4'; g.fillRect(x, y, w, h); g.fillStyle = W.band; g.textAlign = 'center'; g.textBaseline = 'middle'; fitText(g, W.short[0], x + w / 2, y + h * 0.35, w * 0.9, h * 0.35); fitText(g, W.short[1], x + w / 2, y + h * 0.7, w * 0.9, h * 0.35); }, false, '#f4f4f4');
   for (let i = 0; i < counterXs.length; i++) {
     const cx = counterXs[i];
     so.box(1.2, 0.85, 6, cx, 0.425, 7, '#dfe3e8');
     so.box(1.21, 0.12, 6.01, cx, 0.12, 7, '#3a3f4a');                       // kick plate
-    so.box(1.21, 0.08, 6.01, cx, 0.6, 7, '#1aa39a');                        // brand stripe
+    so.box(1.21, 0.08, 6.01, cx, 0.6, 7, W.band);                        // brand stripe
     so.box(1.22, 0.06, 6.02, cx, 0.86, 7, '#3a3f4a');
     // conveyor belt with rollers and side rails
     so.box(0.55, 0.03, 4, cx + 0.28, 0.9, 8, '#1a1c22');
@@ -1417,7 +1944,7 @@ function buildStore(scene) {
     // bagging area + bag hooks with bags
     so.box(0.55, 0.06, 0.9, cx + 0.28, 0.92, 4.45, '#9aa3ad');
     for (let k = 0; k < 3; k++) { so.box(0.28, 0.3, 0.02, cx + 0.62, 0.68, 4.3 + k * 0.03, '#f4f4f4'); }
-    so.label(0.2, 0.16, cx + 0.62, 0.7, 4.367, atlasLabel(1.25, (g, x, y, w, h) => { g.fillStyle = '#f4f4f4'; g.fillRect(x, y, w, h); g.fillStyle = '#1aa39a'; g.textAlign = 'center'; g.textBaseline = 'middle'; fitText(g, 'DRIFT', x + w / 2, y + h * 0.35, w * 0.9, h * 0.35); fitText(g, 'MARKT', x + w / 2, y + h * 0.7, w * 0.9, h * 0.35); }, false, '#f4f4f4'));
+    so.label(0.2, 0.16, cx + 0.62, 0.7, 4.367, bagLabel);
     // cashier chair
     so.cyl(0.18, 0.05, cx - 0.35, 0.55, 5.9, '#1d2230', { seg: 10 });
     so.cyl(0.03, 0.5, cx - 0.35, 0.28, 5.9, '#9aa3ad', { seg: 6 });
@@ -1461,7 +1988,7 @@ function buildStore(scene) {
   const dc = new Obj();
   for (let i = 0; i < 5; i++) buildPlainCart(dc, -7.2, 1.4 + i * 0.26, '#c3c8cf');
   for (const x of [-7.65, -6.75]) {
-    for (const y of [0.45, 0.9]) dc.cyl(0.025, 1.95, x, y, 2.0, y > 0.5 ? '#1aa39a' : '#9aa3ad', { rx: PI / 2, seg: 8 });
+    for (const y of [0.45, 0.9]) dc.cyl(0.025, 1.95, x, y, 2.0, y > 0.5 ? W.band : '#9aa3ad', { rx: PI / 2, seg: 8 });
     for (const z of [1.05, 2.95]) dc.cyl(0.03, 0.92, x, 0.46, z, '#9aa3ad', { seg: 8 });
   }
   addCol(-7.7, 1.0, -6.7, 3.0);
@@ -1477,8 +2004,38 @@ function buildStore(scene) {
   };
   for (const [x, z] of [[-4.2, 1.0], [4.2, 1.0], [7.5, 11.8], [-6.5, 11.8]]) { plant(x, z); addCol(x - 0.4, z - 0.4, x + 0.4, z + 0.4); }
   // trash bin + info board near the entrance
-  dc.cyl(0.25, 0.8, 5.6, 0.4, 0.8, '#3a3f4a', { seg: 10 }); dc.cyl(0.27, 0.08, 5.6, 0.84, 0.8, '#1aa39a', { seg: 10 }); dc.cyl(0.12, 0.02, 5.6, 0.885, 0.8, '#111', { seg: 8 });
+  dc.cyl(0.25, 0.8, 5.6, 0.4, 0.8, '#3a3f4a', { seg: 10 }); dc.cyl(0.27, 0.08, 5.6, 0.84, 0.8, W.band, { seg: 10 }); dc.cyl(0.12, 0.02, 5.6, 0.885, 0.8, '#111', { seg: 8 });
   addCol(5.3, 0.5, 5.9, 1.1);
+  // ---------- world extras ----------
+  if (W.fountain) { // round fountain right in front of the entrance – drive around it!
+    const fx = 0, fz = 9.4;
+    dc.cyl(1.35, 0.5, fx, 0.25, fz, '#e9e2d6', { seg: 16 }); dc.cyl(1.2, 0.05, fx, 0.47, fz, '#4fb0ff', { seg: 16 });
+    dc.cyl(0.25, 1.2, fx, 0.9, fz, '#e9e2d6', { seg: 10 }); dc.cyl(0.6, 0.12, fx, 1.5, fz, '#e9e2d6', { seg: 12 }); dc.cyl(0.5, 0.03, fx, 1.57, fz, '#4fb0ff', { seg: 12 });
+    dc.cyl(0.1, 0.5, fx, 1.8, fz, '#bfe6ff', { seg: 8, rt: 0.3 });
+    for (let k = 0; k < 8; k++) { const a = (k / 8) * TAU; dc.cyl(0.03, 0.4, fx + Math.cos(a) * 0.45, 1.25, fz + Math.sin(a) * 0.45, '#bfe6ff', { seg: 5, rz: Math.cos(a) * 0.5, rx: -Math.sin(a) * 0.5 }); }
+    addCol(fx - 1.2, fz - 1.2, fx + 1.2, fz + 1.2);
+    for (const x of [-11.5, 11.5]) { // palms
+      dc.cyl(0.5, 0.6, x, 0.3, 12.2, '#c9a96a', { seg: 10 }); dc.cyl(0.12, 2.6, x, 1.9, 12.2, '#8a6a3a', { seg: 7, rt: 0.8 });
+      for (let k = 0; k < 7; k++) { const a = (k / 7) * TAU; dc.add(geoCone(4), x + Math.cos(a) * 0.6, 3.1, 12.2 + Math.sin(a) * 0.6, 0.18, 1.4, 0.05, '#3f9b3a', -Math.sin(a) * 1.2, 0, Math.cos(a) * 1.2); }
+      addCol(x - 0.5, 11.7, x + 0.5, 12.7);
+    }
+  }
+  if (W.shelf === 'rack') { // pallets near the entrance + a parked forklift
+    for (let k = 0; k < 3; k++) { dc.box(1.2, 0.14, 1.0, 7.6, 0.07 + k * 0.15, 1.6, '#b88a50'); }
+    dc.box(1.1, 0.6, 0.9, 7.6, 0.75, 1.6, '#c8914a'); addCol(7.0, 1.1, 8.2, 2.1);
+    const fl = new Obj();
+    fl.box(1.0, 0.7, 1.6, 0, 0.55, 0, '#f2c200'); fl.box(0.9, 0.5, 0.6, 0, 1.15, -0.4, '#f2c200'); fl.box(0.8, 0.06, 0.9, 0, 2.1, 0.1, '#1d2230');
+    for (const sx of [-0.4, 0.4]) { fl.box(0.06, 1.8, 0.06, sx, 1.2, 0.5, '#1d2230'); fl.box(0.06, 1.8, 0.06, sx, 1.2, -0.3, '#1d2230'); fl.box(0.12, 2.2, 0.1, sx, 1.1, 0.85, '#3a3f4a'); fl.box(0.1, 0.05, 0.9, sx, 0.12, 1.3, '#3a3f4a'); }
+    for (const sx of [-0.52, 0.52]) for (const sz of [-0.55, 0.5]) fl.cyl(0.22, 0.18, sx, 0.22, sz, '#222', { rz: PI / 2, seg: 10 });
+    dc.put(fl, -11.5, 0, 12.0, PI / 2); addCol(-12.5, 11.1, -10.3, 12.9);
+  }
+  if (W.ice) { // ice blocks + icicles
+    for (const [x, z] of [[6.5, 1.4], [-11.5, 12.2], [11.5, 12.2]]) {
+      for (let k = 0; k < 4; k++) dc.box(0.6, 0.45, 0.6, x + (k % 2) * 0.62 - 0.3, 0.225 + Math.floor(k / 2) * 0.46, z, '#bfe6ff', { ry: k * 0.1 });
+      addCol(x - 0.65, z - 0.35, x + 0.65, z + 0.35);
+    }
+    for (let x = -29; x < 30; x += 1.3) for (const zz of [0.25, 49.75]) dc.cone(0.06, 0.3 + (Math.abs(x * 7) % 3) * 0.12, x, STORE.H - 0.25, zz, '#e6f7ff', { rx: PI, seg: 5 });
+  }
   flat.addObj(dc);
 
   // ---------- products ----------
@@ -1520,7 +2077,7 @@ function buildStore(scene) {
   const shelves = acc.build(VCMAT); shelves.castShadow = true; shelves.receiveShadow = true; scene.add(shelves);
   const walls = flat.build(VCMAT); walls.receiveShadow = true; scene.add(walls);
 
-  buildSigns(scene, coolers);
+  buildSigns(scene, coolers, W);
 }
 
 let PRICE_UV = [];
@@ -1578,7 +2135,7 @@ function hangSign(scene, tex, x, y, z, ry, wdt = 2.6, both = true) {
   const wire = new T.Mesh(new T.CylinderGeometry(0.01, 0.01, STORE.H - y), new T.MeshBasicMaterial({ color: '#555' }));
   wire.position.set(x, (STORE.H + y) / 2, z); scene.add(wire);
 }
-function buildSigns(scene, coolers) {
+function buildSigns(scene, coolers, W) {
   let n = 1;
   for (let h = 0; h < 2; h++) for (let a = 0; a < 7; a++) {
     const s = SECTIONS[a][h], [za, zb] = HALVES[h];
@@ -1587,14 +2144,14 @@ function buildSigns(scene, coolers) {
     hangSign(scene, signTex(s.n, s.e, 'GANG ' + (n - 1), s.col), AISLES[a].cx, 3.2, zb - 0.4, PI);
   }
   for (const c of coolers) {
-    const m = new T.Mesh(new T.PlaneGeometry(3.6, 3.6 * 200 / 512), new T.MeshBasicMaterial({ map: signTex(c.n, c.e, 'KÜHLREGAL', c.col) }));
+    const m = new T.Mesh(new T.PlaneGeometry(3.6, 3.6 * 200 / 512), new T.MeshBasicMaterial({ map: signTex(c.n, c.e, W.back.tag, c.col) }));
     m.position.set((c.x0 + c.x1) / 2, 3.3, 49.9); m.rotation.y = PI; scene.add(m);
   }
   hangSign(scene, signTex('Kasse', '🛒', 'BEZAHLEN', '#e8322b'), -18, 3.4, 11.2, 0, 3.4);
-  hangSign(scene, signTex('Obst & Gemüse', '🍎', 'FRISCH', '#3f9b3a'), 17, 3.4, 11.2, 0, 3.4);
-  hangSign(scene, signTex('Willkommen!', '👋', 'DRIFT-MARKT', '#1aa39a'), 0, 3.6, 0.6, 0, 3.2, false);
+  hangSign(scene, signTex(W.front.n, W.front.e, W.front.sub, W.front.col), 17, 3.4, 11.2, 0, 3.4);
+  hangSign(scene, signTex('Willkommen!', '👋', W.logo, W.band), 0, 3.6, 0.6, 0, 3.2, false);
   // wall posters
-  const posters = [['ANGEBOT', '-50%', '#e8322b'], ['NEU', 'Drift-Cola', '#2a62c9'], ['BITTE', 'Nicht driften!', '#f2a20c'], ['SUPER', 'Frisch!', '#3f9b3a']];
+  const posters = W.posters;
   posters.forEach(([a, b, c], i) => {
     const tex = canvasTex(256, 320, (g, w, h) => {
       g.fillStyle = c; g.fillRect(0, 0, w, h); g.fillStyle = '#fff'; g.fillRect(12, 12, w - 24, h - 24);
@@ -2074,10 +2631,8 @@ function clearHazards(scene) {
   DYN_BOXES.length = 0; DYN_CIRCLES.length = 0;
 }
 let WET_UV = null;
-const puddleMat = new T.MeshLambertMaterial({ color: '#8fd3ff', transparent: true, opacity: 0.55, depthWrite: false });
-const puddleShine = new T.MeshBasicMaterial({ color: '#e6f7ff', transparent: true, opacity: 0.5, depthWrite: false });
-function setupHazards(scene, level) {
-  clearHazards(scene);
+// permanent labels (drawn once before the world-specific part of the atlas)
+function makeHazardLabels() {
   if (!WET_UV) WET_UV = atlasLabel(0.64, (g, x, y, w, h) => {
     g.fillStyle = '#ffd21f'; g.fillRect(x, y, w, h);
     g.fillStyle = '#1d2230'; g.beginPath(); g.moveTo(x + w / 2, y + h * 0.06); g.lineTo(x + w * 0.92, y + h * 0.55); g.lineTo(x + w * 0.08, y + h * 0.55); g.closePath(); g.fill();
@@ -2085,6 +2640,12 @@ function setupHazards(scene, level) {
     g.fillStyle = '#1d2230'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = `900 ${h * 0.3}px ${FONT}`; g.fillText('!', x + w / 2, y + h * 0.37);
     fitText(g, 'VORSICHT', x + w / 2, y + h * 0.68, w * 0.9, h * 0.13); fitText(g, 'Rutschgefahr', x + w / 2, y + h * 0.84, w * 0.9, h * 0.1, 800);
   }, false, '#ffd21f');
+}
+const puddleMat = new T.MeshLambertMaterial({ color: '#8fd3ff', transparent: true, opacity: 0.55, depthWrite: false });
+const puddleShine = new T.MeshBasicMaterial({ color: '#e6f7ff', transparent: true, opacity: 0.5, depthWrite: false });
+function setupHazards(scene, level) {
+  clearHazards(scene);
+  makeHazardLabels();
   const cfg = levelCfg(level);
   rng = mulberry32(1000 + level * 17);
   const aisleSpot = () => { const a = RI(0, 6), h = RI(0, 1), A = AISLES[a]; const [za, zb] = HALVES[h]; return { a, h, A, za, zb }; };
@@ -2387,7 +2948,8 @@ const scene = new T.Scene();
 scene.background = new T.Color('#a9d8ff');
 scene.fog = new T.Fog('#e9e4d8', 28, 75);
 const camera = new T.PerspectiveCamera(settings.fov, 1, 0.05, 300);
-scene.add(new T.HemisphereLight('#ffffff', '#b3a58e', 1.55));
+const hemi = new T.HemisphereLight('#ffffff', '#b3a58e', 1.55);
+scene.add(hemi);
 const sun = new T.DirectionalLight('#fff4e2', 1.5);
 sun.castShadow = true;
 sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.02;
@@ -2411,10 +2973,37 @@ applyQuality(); resize();
 window.addEventListener('resize', resize);
 
 // ---------- world ----------
-buildProductGeos();
-buildStore(scene);
-buildCashiers(scene);
-const cart = buildCart();
+const cart = buildCart();       // the cart's decals stay in the atlas for good
+makeHazardLabels();
+const ATLAS_BASE = atlasMark(); // everything after this is redrawn per world
+let storeGroup = null;
+function disposeTree(g) {
+  g.traverse((o) => {
+    if (!o.isMesh) return;
+    if (o.geometry && !o.isInstancedMesh) o.geometry.dispose();
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    for (const m of mats) if (m && m !== VCMAT) { if (m.map && m.map !== ATLAS) m.map.dispose(); m.dispose(); }
+  });
+}
+const LIGHT_BASE = { hemi: 1.55, sun: 1.5, fog: null };
+// build a whole world: products, store, cashiers, light & fog
+function loadWorld(id) {
+  const W = WORLDS[id] || WORLDS.std;
+  if (storeGroup) { scene.remove(storeGroup); disposeTree(storeGroup); }
+  CASHIERS.length = 0;
+  atlasRewind(ATLAS_BASE);
+  buildProductGeos(worldProductIds(W).map((k) => PROD[k]));
+  storeGroup = new T.Group(); scene.add(storeGroup);
+  buildStore(storeGroup, W);
+  buildCashiers(storeGroup);
+  scene.background = new T.Color(W.light.bg);
+  scene.fog.color.set(W.fog[0]); scene.fog.near = W.fog[1]; scene.fog.far = W.fog[2];
+  hemi.color.set(W.light.hemi[0]); hemi.groundColor.set(W.light.hemi[1]); hemi.intensity = W.light.hemi[2];
+  sun.color.set(W.light.sun[0]); sun.intensity = W.light.sun[1];
+  LIGHT_BASE.hemi = hemi.intensity; LIGHT_BASE.sun = sun.intensity; LIGHT_BASE.fog = scene.fog.color.clone();
+  G.world = W.id;
+  const free = atlasFree(); if (free.small < 0 || free.big < 0) console.warn('atlas full', free);
+}
 scene.add(cart.root);
 const eyeObj = new T.Object3D(); cart.body.add(eyeObj);
 // third-person body of the rider (hidden in first person)
@@ -2496,7 +3085,7 @@ function physicsStep(dt, ctl) {
     else if (fwd < maxV) fwd += PHY.ACCEL * Math.pow(clamp(1 - fwd / maxV, 0, 1), 0.55) * dt;
   }
   if (down) {
-    if (fwd > 0.25) fwd = Math.max(0, fwd - PHY.BRAKE * dt);
+    if (fwd > 0.25) fwd = Math.max(0, fwd - PHY.BRAKE * (0.5 + 0.5 * CUR_WORLD.grip) * dt);
     else fwd = Math.max(-PHY.REV, fwd - PHY.REVACC * dt);
   }
   if (!up && !down) fwd -= Math.sign(fwd) * Math.min(Math.abs(fwd), (0.3 + Math.abs(fwd) * 0.1) * dt);
@@ -2525,11 +3114,11 @@ function physicsStep(dt, ctl) {
   if (lock && spd > 0.01) {
     // slide on in the same direction, braking: ~5 m/s² straight, up to ~12 m/s² fully sideways
     const side = Math.abs(Math.sin(angDiff(Math.atan2(vx, vz), C.h)));
-    const nsp = Math.max(0, spd - lerp(PHY.LOCK_BRAKE, PHY.LOCK_SIDE_BRAKE, side) * (C.puddle ? 0.35 : 1) * dt);
+    const nsp = Math.max(0, spd - lerp(PHY.LOCK_BRAKE, PHY.LOCK_SIDE_BRAKE, side) * (C.puddle ? 0.35 : 1) * (0.4 + 0.6 * CUR_WORLD.grip) * dt);
     vx *= nsp / spd; vz *= nsp / spd; spd = nsp;
   } else if (spd > 0.05) {
     const th = C.h + (fwd < 0 ? PI : 0);
-    let grip = hand ? PHY.DRIFT_GRIP : PHY.GRIP;
+    let grip = (hand ? PHY.DRIFT_GRIP : PHY.GRIP) * CUR_WORLD.grip;
     if (C.puddle) grip *= 0.2;
     let d = angDiff(Math.atan2(vx, vz), th) * Math.exp(-grip * dt); // remaining slip angle
     const maxSlip = C.puddle ? 1.3 : hand ? 0.95 : 0.7;
@@ -2746,15 +3335,16 @@ function makeMarker(sp) {
 const G = { state: 'menu', level: 1, time: 0, clock: 0, list: [], got: new Set(), markers: {}, near: null, slowT: 0, sinceGo: 0, cfg: levelCfg(1),
   anim: null, cine: null, lane: null, scan: null, items: [], total: 0, prev: 'menu', pausedFrom: null };
 
+const bestKey = (lv = G.level) => (G.world === 'std' ? '' : G.world + '_') + 'L' + lv;
 function pickList(level) {
-  rng = mulberry32(777 + level * 131);
+  rng = mulberry32(777 + level * 131 + WORLD_ORDER.indexOf(G.world) * 9973);
   const cfg = levelCfg(level);
-  const pool = shuffle(PRODUCTS.slice());
+  const pool = shuffle(PRODUCTS.filter((p) => SPOTS[p.id] && p.section));
   const perSec = {}, out = [];
   for (const p of pool) {
     if (out.length >= cfg.items) break;
     if ((perSec[p.section] || 0) >= 2) continue;
-    if (level === 1 && p.section === 'Obst & Gemüse' && out.some((q) => q.section === p.section)) continue;
+    if (level === 1 && p.section === CUR_WORLD.front.n && out.some((q) => q.section === p.section)) continue;
     perSec[p.section] = (perSec[p.section] || 0) + 1;
     out.push(p);
   }
@@ -2817,8 +3407,14 @@ function showMenu() {
   setupLevel(1);
   resetCart(MENU_POS.x, MENU_POS.z, PI / 2);
 }
+let selWorld = 'std';
 function startGame() {
   ['menu', 'worlds'].forEach((id) => show(id, false));
+  if (selWorld !== G.world) {
+    show('loading'); // give the browser one frame to show the loading screen
+    setTimeout(() => { loadWorld(selWorld); show('loading', false); startGame(); }, 60);
+    return;
+  }
   setupLevel(1);
   beginIntro(true);
 }
@@ -2936,9 +3532,9 @@ function updateItems(dt) {
 function startCheckout(lane) {
   G.state = 'checkout'; releaseLock(); setPrompt(null); show('slow', false); C.nitro = 0; show('nitro', false);
   G.lane = lane;
-  const best = bests['L' + G.level];
+  const best = bests[bestKey()];
   G.isRecord = !best || G.time < best;
-  if (G.isRecord) { bests['L' + G.level] = G.time; saveJ('sd_bests', bests); }
+  if (G.isRecord) { bests[bestKey()] = G.time; saveJ('sd_bests', bests); }
   G.co = { t: 0, from: { x: C.x, z: C.z, h: C.h }, h: Math.cos(C.h) < 0 ? PI : 0, camFrom: camera.position.clone(), camQ: camera.quaternion.clone(), next: 0.9, idx: 0, shown: false };
   G.total = 0;
   setCine(true);
@@ -2978,7 +3574,7 @@ function updateCheckout(dt) {
     $('resT').textContent = G.isRecord ? 'Einkauf erledigt! 🏆' : 'Einkauf erledigt!';
   }
   if (co.shown) {
-    const best = bests['L' + G.level];
+    const best = bests[bestKey()];
     $('resS').innerHTML = `Level ${G.level} · Zeit <b>${fmt(G.time)}</b>${G.isRecord ? ' <span class="rec">NEUER REKORD!</span>' : ' · Bestzeit ' + fmt(best)}<br>${G.list.length} Produkte · Summe <b>${G.total.toFixed(2)} €</b>`;
   }
 }
@@ -3279,13 +3875,24 @@ for (const [id, fn] of [['sMusic', (v) => (settings.music = v === '1')], ['sQual
     $(id).querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
   });
 }
+function renderWorlds() {
+  const el = $('worldList'); el.innerHTML = '';
+  for (const id of WORLD_ORDER) {
+    const W = WORLDS[id], d = document.createElement('div');
+    d.className = 'world' + (id === selWorld ? ' on' : ''); d.dataset.world = id;
+    let lv = 0; while (bests[(id === 'std' ? '' : id + '_') + 'L' + (lv + 1)] != null) lv++;
+    d.innerHTML = `<div class="pic" style="background:linear-gradient(135deg,${W.grad[0]},${W.grad[1]})">${W.icon}</div><b>${W.name}</b><small>${W.desc}</small><div class="best">${lv ? '🏆 ' + lv + ' Level geschafft' : '&nbsp;'}</div>`;
+    d.addEventListener('click', () => { selWorld = id; SFX.click(); renderWorlds(); });
+    el.appendChild(d);
+  }
+}
 document.addEventListener('click', (e) => {
   const b = e.target.closest('[data-act]'); if (!b) return;
   SFX.init(); SFX.click();
   const act = b.dataset.act, panel = b.closest('.overlay, #result');
   const pid = panel ? panel.id : '';
   switch (act) {
-    case 'play': show('menu', false); show('worlds'); break;
+    case 'play': show('menu', false); renderWorlds(); show('worlds'); break;
     case 'start': startGame(); break;
     case 'settings': openSettings(pid === 'pause' ? 'pause' : 'menu'); if (pid === 'menu') show('menu', false); else show('pause', false); break;
     case 'credits': show('menu', false); show('credits'); break;
@@ -3304,6 +3911,7 @@ $('pauseBtn').addEventListener('click', (e) => { e.stopPropagation(); SFX.init()
 document.addEventListener('visibilitychange', () => { if (document.hidden && (G.state === 'play' || G.state === 'countdown')) togglePause(); });
 
 // boot
+loadWorld("std");
 showMenu();
 requestAnimationFrame(frame);
 
