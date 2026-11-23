@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Shopping Drifters</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; color: #fff; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  .hidden { display: none !important; }
+  .shadow { text-shadow: 0 2px 0 rgba(0,0,0,.55), 0 0 12px rgba(0,0,0,.35); }
+  button { font-family: inherit; -webkit-tap-highlight-color: transparent; }
+
+  /* ---------- cinematic bars ---------- */
+  .bar { position: fixed; left: 0; right: 0; height: 13vh; background: #000; z-index: 6; transition: transform .9s cubic-bezier(.6,0,.3,1); pointer-events: none; }
+  #barT { top: 0; transform: translateY(-100%); }
+  #barB { bottom: 0; transform: translateY(100%); }
+  body.cine #barT, body.cine #barB { transform: none; }
+  #fade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; z-index: 7; transition: opacity .45s; }
+  #fade.on { opacity: 1; }
+
+  /* ---------- HUD ---------- */
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 3; }
+  #clock { position: absolute; top: max(14px, env(safe-area-inset-top)); left: max(16px, env(safe-area-inset-left)); display: flex; align-items: center; gap: 10px; padding: 8px 16px 8px 10px; background: rgba(15,18,28,.62); border: 2px solid rgba(255,255,255,.18); border-radius: 16px; }
+  #clock .ic { width: 44px; height: 44px; border-radius: 50%; background: #fff; border: 4px solid #e8322b; position: relative; box-shadow: inset 0 0 0 2px #ddd; }
+  #clock .ic::before, #clock .ic::after { content: ''; position: absolute; left: 50%; bottom: 50%; width: 3px; background: #1d2230; border-radius: 2px; transform-origin: 50% 100%; margin-left: -1.5px; }
+  #clock .ic::before { height: 13px; transform: rotate(var(--m, 0deg)); }
+  #clock .ic::after { height: 16px; width: 2px; margin-left: -1px; background: #e8322b; transform: rotate(var(--s, 0deg)); }
+  #time { font-size: 30px; font-weight: 900; font-variant-numeric: tabular-nums; letter-spacing: .5px; line-height: 1; }
+  #lvl { font-size: 12px; font-weight: 800; letter-spacing: 2px; opacity: .8; margin-top: 3px; }
+  #pauseBtn { pointer-events: auto; position: absolute; top: calc(max(14px, env(safe-area-inset-top)) + 72px); left: max(16px, env(safe-area-inset-left)); width: 44px; height: 44px; border-radius: 12px; border: 2px solid rgba(255,255,255,.3); background: rgba(15,18,28,.55); color: #fff; font-size: 16px; font-weight: 900; cursor: pointer; }
+
+  #list { position: absolute; top: max(14px, env(safe-area-inset-top)); right: max(16px, env(safe-area-inset-right)); width: 250px; padding: 14px 16px 12px 22px; background: #fffbe9; color: #2a2a35; border-radius: 4px 4px 10px 10px; transform: rotate(1.2deg); box-shadow: 0 8px 24px rgba(0,0,0,.35);
+    background-image: repeating-linear-gradient(transparent 0 25px, #cfe0f5 25px 26px); background-position: 0 44px; font-family: "Chalkboard SE", "Comic Sans MS", "Marker Felt", "Segoe Print", cursive; }
+  #list::before { content: ''; position: absolute; top: 0; bottom: 0; left: 12px; width: 2px; background: #f1a3a3; }
+  #list::after { content: ''; position: absolute; top: -10px; left: 50%; width: 70px; height: 22px; margin-left: -35px; background: rgba(255,240,170,.75); transform: rotate(-3deg); box-shadow: 0 1px 2px rgba(0,0,0,.15); }
+  #list .head { font-size: 19px; font-weight: 900; display: flex; justify-content: space-between; margin-bottom: 6px; }
+  #list .head span { color: #e8322b; }
+  #items { list-style: none; margin: 0; padding: 0; }
+  #items li { font-size: 17px; line-height: 26px; height: 26px; display: flex; align-items: center; gap: 7px; white-space: nowrap; transition: color .3s; }
+  #items li .bx { width: 15px; height: 15px; border: 2px solid #2a2a35; border-radius: 3px; flex: none; position: relative; }
+  #items li.got { color: #8b8b95; text-decoration: line-through; text-decoration-color: #e8322b; text-decoration-thickness: 2px; }
+  #items li.got .bx::after { content: '✔'; position: absolute; left: -1px; top: -9px; color: #2bb24a; font-size: 20px; font-weight: 900; }
+  #items li.near { color: #e8322b; font-weight: 900; }
+  #items li.pop { animation: pop .5s; }
+  @keyframes pop { 0% { transform: scale(1); } 40% { transform: scale(1.18); } 100% { transform: scale(1); } }
+  #listFoot { margin-top: 6px; font-size: 16px; font-weight: 900; color: #2bb24a; min-height: 0; }
+  #listFoot:empty { display: none; }
+
+  #prompt { position: absolute; bottom: 34vh; left: 50%; transform: translateX(-50%); font-size: 22px; font-weight: 800; padding: 10px 20px; background: rgba(15,18,28,.7); border-radius: 14px; border: 2px solid rgba(255,255,255,.25); white-space: nowrap; }
+  #prompt.warn { background: rgba(200,30,30,.75); }
+  #prompt kbd, .panel kbd { display: inline-block; min-width: 30px; padding: 2px 8px; border-radius: 7px; background: #ffd21f; color: #1d2230; border-bottom: 3px solid #a5860f; font-family: inherit; font-weight: 900; text-align: center; }
+  #slow { position: absolute; top: 26%; left: 50%; transform: translateX(-50%); text-align: center; color: #ff3b3b; }
+  #slow .t { font-size: 34px; font-weight: 900; letter-spacing: 3px; }
+  #slow .n { font-size: 110px; font-weight: 900; line-height: 1; animation: beat 1s infinite; }
+  #slow .s { font-size: 17px; font-weight: 800; color: #fff; }
+  @keyframes beat { 0% { transform: scale(1.25); } 30% { transform: scale(1); } }
+  #toast { position: absolute; top: 22%; left: 50%; transform: translateX(-50%); font-size: 24px; font-weight: 900; padding: 10px 22px; background: rgba(15,18,28,.65); border-radius: 14px; opacity: 0; transition: opacity .35s; white-space: nowrap; }
+  #toast.show { opacity: 1; transition: none; }
+  #turbo { position: absolute; top: 60%; left: 50%; transform: translateX(-50%) skewX(-12deg); font-size: 46px; font-weight: 900; font-style: italic; color: #4ff2ff; letter-spacing: 3px; opacity: 0; transition: opacity .4s; text-shadow: 0 0 18px #1aa3ff, 0 3px 0 #0a3a6a; }
+  #turbo.show { opacity: 1; transition: none; }
+  #vignette { position: absolute; inset: 0; box-shadow: inset 0 0 160px rgba(255,0,0,.0); transition: box-shadow .2s; }
+
+  #count { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); z-index: 8; font-size: 160px; font-weight: 900; pointer-events: none; color: #ffe066; text-shadow: 0 6px 0 #a5560f, 0 0 40px rgba(0,0,0,.5); }
+  #count.go { color: #4ff26a; text-shadow: 0 6px 0 #1a7a2a, 0 0 40px rgba(0,0,0,.5); }
+  #count.anim { animation: cnt .9s ease-out forwards; }
+  @keyframes cnt { 0% { transform: translate(-50%,-50%) scale(2.2); opacity: 0; } 20% { transform: translate(-50%,-50%) scale(1); opacity: 1; } 80% { opacity: 1; } 100% { transform: translate(-50%,-50%) scale(.8); opacity: 0; } }
+
+  /* ---------- menus ---------- */
+  .overlay { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; }
+  #menu { justify-content: flex-start; background: linear-gradient(90deg, rgba(10,12,22,.85) 0%, rgba(10,12,22,.55) 45%, rgba(10,12,22,0) 75%); padding-left: max(6vw, env(safe-area-inset-left)); }
+  .mcol { width: min(440px, calc(100vw - 32px)); }
+  h1.logo { margin: 0 0 6px; font-size: 76px; font-weight: 900; letter-spacing: -2px; line-height: .92; background: linear-gradient(180deg,#ffe066,#ff8a3d); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 4px 0 #7a2e0b); transform: rotate(-3deg); }
+  h1.logo span { display: block; background: linear-gradient(180deg,#8be9ff,#3d8bff); -webkit-background-clip: text; background-clip: text; margin-left: 40px; }
+  .tag { font-size: 16px; font-weight: 700; opacity: .85; margin: 14px 0 26px; }
+  .btn { pointer-events: auto; display: block; width: 100%; margin: 10px 0; padding: 15px 26px; font-size: 21px; font-weight: 900; color: #1a1205; background: linear-gradient(180deg,#ffe066,#ffae3d); border: 0; border-radius: 14px; cursor: pointer; box-shadow: 0 5px 0 #a5560f; text-align: left; transition: transform .08s; }
+  .btn:hover { filter: brightness(1.08); transform: translateX(4px); }
+  .btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #a5560f; }
+  .btn.grey { color: #fff; background: linear-gradient(180deg,#4b5275,#363b58); box-shadow: 0 5px 0 #1f2236; }
+  .btn.green { color: #fff; background: linear-gradient(180deg,#4fd36a,#22a33e); box-shadow: 0 5px 0 #137028; }
+  .btn .ic { display: inline-block; width: 34px; }
+  .keys { margin-top: 22px; font-size: 14px; line-height: 1.9; opacity: .9; }
+  .keys kbd { display: inline-block; min-width: 26px; padding: 1px 7px; border-radius: 6px; background: #2c3150; border: 1px solid #4a5280; border-bottom-width: 3px; font-family: inherit; font-size: 12px; font-weight: 800; text-align: center; margin-right: 2px; }
+  .panelWrap { background: radial-gradient(ellipse at center, rgba(20,24,40,.6), rgba(5,6,12,.88)); }
+  .panel { width: min(600px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: 26px 30px; background: rgba(18,20,32,.95); border: 2px solid rgba(255,255,255,.12); border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,.5); text-align: center; }
+  .panel h2 { margin: 0 0 16px; font-size: 32px; font-weight: 900; }
+  .panel .btn { text-align: center; }
+  .row2 { display: flex; gap: 12px; } .row2 .btn { flex: 1; }
+  .settings { display: grid; grid-template-columns: 1fr auto; gap: 14px 16px; align-items: center; text-align: left; font-size: 16px; font-weight: 700; margin: 8px 0 18px; }
+  .settings input[type=range] { width: 200px; accent-color: #ffae3d; }
+  .seg { display: inline-flex; background: #2c3150; border-radius: 10px; padding: 3px; }
+  .seg button { border: 0; background: transparent; color: #fff; padding: 7px 12px; font-weight: 800; font-size: 14px; border-radius: 8px; cursor: pointer; }
+  .seg button.on { background: #ffae3d; color: #1a1205; }
+  .worlds { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
+  .world { position: relative; padding: 16px; border-radius: 16px; background: #2c3150; border: 3px solid transparent; cursor: pointer; text-align: left; color: #fff; }
+  .world.on { border-color: #ffd21f; background: #363d66; }
+  .world .pic { height: 90px; border-radius: 10px; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; font-size: 50px; background: linear-gradient(135deg,#1aa39a,#2a62c9); }
+  .world b { font-size: 18px; } .world small { display: block; opacity: .75; margin-top: 3px; font-size: 13px; }
+  .world.locked { cursor: default; filter: grayscale(1); opacity: .55; }
+  .world.locked .pic { background: #444a66; }
+  .credits { text-align: left; font-size: 15px; line-height: 1.6; }
+  .credits h3 { margin: 14px 0 2px; color: #ffd21f; font-size: 15px; letter-spacing: 1px; text-transform: uppercase; }
+
+  /* death screen (Minecraft style) */
+  #dead { flex-direction: column; background: linear-gradient(180deg, rgba(150,0,0,.55), rgba(60,0,0,.8)); z-index: 11; text-align: center; }
+  #dead h1 { margin: 0; font-size: 84px; font-weight: 900; letter-spacing: 2px; text-shadow: 4px 4px 0 #3a0000; }
+  #dead p { font-size: 20px; font-weight: 700; margin: 8px 0 28px; text-shadow: 2px 2px 0 #3a0000; }
+  #dead .btn { width: 380px; max-width: 80vw; text-align: center; margin: 8px auto; color: #fff; background: #6f6f6f; box-shadow: inset 0 -4px 0 #4a4a4a, inset 0 3px 0 #a0a0a0, 0 0 0 3px #111; border-radius: 4px; }
+  #dead .btn:hover { background: #7f8bc5; transform: none; }
+
+  /* results bottom sheet */
+  #result { position: fixed; left: 50%; bottom: calc(13vh + 14px); transform: translateX(-50%); z-index: 9; width: min(760px, calc(100vw - 28px)); padding: 18px 22px; background: rgba(18,20,32,.94); border: 2px solid rgba(255,255,255,.15); border-radius: 20px; box-shadow: 0 16px 50px rgba(0,0,0,.5); display: flex; gap: 20px; align-items: center; animation: up .5s cubic-bezier(.2,1.4,.4,1); }
+  @keyframes up { from { transform: translate(-50%, 140%); } to { transform: translate(-50%, 0); } }
+  #result .info { flex: 1; text-align: left; }
+  #result .info .t { font-size: 26px; font-weight: 900; color: #4ff26a; }
+  #result .info .s { font-size: 16px; font-weight: 700; opacity: .9; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  #result .info .rec { color: #ffd21f; font-weight: 900; }
+  #result .btns { display: flex; flex-direction: column; gap: 4px; width: 260px; }
+  #result .btn { margin: 4px 0; text-align: center; font-size: 19px; padding: 12px; }
+
+  @media (max-width: 760px), (max-height: 560px) {
+    h1.logo { font-size: 52px; } #list { width: 210px; transform: scale(.9) rotate(1.2deg); transform-origin: top right; }
+    #result { flex-direction: column; } #result .btns { width: 100%; flex-direction: row; } #result .btn { flex: 1; }
+    #dead h1 { font-size: 56px; }
+    .keys { display: none; }
+  }
+  body.touch .kbOnly { display: none; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hud" class="hidden">
+  <div id="vignette"></div>
+  <div id="clock" class="shadow"><div class="ic" id="clockIc"></div><div><div id="time">00:00.00</div><div id="lvl">LEVEL 1</div></div></div>
+  <button id="pauseBtn" title="Pause (Esc / P)">❚❚</button>
+  <div id="list"><div class="head">Einkaufsliste <span id="listCount">0/5</span></div><ul id="items"></ul><div id="listFoot"></div></div>
+  <div id="prompt" class="hidden"></div>
+  <div id="slow" class="hidden shadow"><div class="t">ZU LANGSAM!</div><div class="n" id="slowN">5</div><div class="s" id="slowS">Gib Gas!</div></div>
+  <div id="toast" class="shadow"></div>
+  <div id="turbo">TURBO!</div>
+</div>
+<div id="count" class="hidden"></div>
+<div id="barT" class="bar"></div><div id="barB" class="bar"></div>
+<div id="fade"></div>
+
+<!-- main menu -->
+<div id="menu" class="overlay">
+  <div class="mcol" id="mMain">
+    <h1 class="logo">SHOPPING<span>DRIFTERS</span></h1>
+    <div class="tag">🛒 Einkaufswagen. Motor. Keine Regeln.</div>
+    <button class="btn" data-act="play"><span class="ic">▶</span>Spielen</button>
+    <button class="btn grey" data-act="settings"><span class="ic">⚙</span>Einstellungen</button>
+    <button class="btn grey" data-act="credits"><span class="ic">★</span>Credits</button>
+    <div class="keys kbOnly">
+      <kbd>W</kbd> Gas &nbsp; <kbd>S</kbd> Bremsen / Rückwärts &nbsp; <kbd>A</kbd><kbd>D</kbd> Lenken<br>
+      <kbd>Leertaste</kbd> Driften (lang driften + loslassen = Turbo!)<br>
+      <kbd>E</kbd> Produkt einladen &nbsp; <kbd>Maus</kbd> Umschauen &nbsp; <kbd>Esc</kbd>/<kbd>P</kbd> Pause
+    </div>
+  </div>
+</div>
+
+<div id="worlds" class="overlay panelWrap hidden">
+  <div class="panel">
+    <h2>Welt wählen</h2>
+    <div class="worlds">
+      <div class="world on" data-world="std"><div class="pic">🛒</div><b>Drift-Markt</b><small>Der ganz normale Supermarkt um die Ecke.</small></div>
+      <div class="world locked"><div class="pic">🔒</div><b>Baumarkt</b><small>Bald verfügbar…</small></div>
+      <div class="world locked"><div class="pic">🔒</div><b>Mega-Mall</b><small>Bald verfügbar…</small></div>
+      <div class="world locked"><div class="pic">🔒</div><b>Tiefkühl-Lager</b><small>Bald verfügbar…</small></div>
+    </div>
+    <div class="row2"><button class="btn grey" data-act="back">Zurück</button><button class="btn green" data-act="start">Los geht's!</button></div>
+  </div>
+</div>
+
+<div id="settings" class="overlay panelWrap hidden">
+  <div class="panel">
+    <h2>Einstellungen</h2>
+    <div class="settings">
+      <span>Lautstärke</span><input type="range" id="sVol" min="0" max="1" step="0.05">
+      <span>Musik</span><div class="seg" id="sMusic"><button data-v="1">An</button><button data-v="0">Aus</button></div>
+      <span>Grafik</span><div class="seg" id="sQual"><button data-v="low">Niedrig</button><button data-v="mid">Mittel</button><button data-v="high">Hoch</button></div>
+      <span>Sichtfeld (FOV) <b id="sFovV"></b></span><input type="range" id="sFov" min="60" max="100" step="1">
+      <span>Maus-Empfindlichkeit</span><input type="range" id="sSens" min="0.3" max="2" step="0.1">
+      <span>Kamerawackeln</span><div class="seg" id="sShake"><button data-v="1">An</button><button data-v="0">Aus</button></div>
+    </div>
+    <button class="btn" data-act="back">Fertig</button>
+  </div>
+</div>
+
+<div id="credits" class="overlay panelWrap hidden">
+  <div class="panel">
+    <h2>Credits</h2>
+    <div class="credits">
+      <h3>Idee &amp; Spieldesign</h3>Wuppiest
+      <h3>Programmierung, 3D-Modelle &amp; Sound</h3>Claude (Anthropic) – alle Modelle sind aus einfachen Formen im Code gebaut, alle Sounds werden live synthetisiert.
+      <h3>3D-Engine</h3>three.js r159 – © 2010-2023 three.js authors, MIT-Lizenz
+      <h3>Danke an</h3>Alle Einkaufswagen, die für dieses Spiel gedriftet sind.
+    </div>
+    <button class="btn" data-act="back" style="margin-top:18px">Zurück</button>
+  </div>
+</div>
+
+<div id="pause" class="overlay panelWrap hidden">
+  <div class="panel">
+    <h2>Pause</h2>
+    <button class="btn green" data-act="resume">Weiter</button>
+    <button class="btn grey" data-act="restart">Level neu starten</button>
+    <button class="btn grey" data-act="settings">Einstellungen</button>
+    <button class="btn grey" data-act="menu">Hauptmenü</button>
+  </div>
+</div>
+
+<div id="dead" class="overlay hidden">
+  <h1>Zu langsam!</h1>
+  <p id="deadMsg">Dein Einkaufswagen ist eingeschlafen.</p>
+  <button class="btn" data-act="retry">Erneut versuchen</button>
+  <button class="btn" data-act="menu">Hauptmenü</button>
+</div>
+
+<div id="result" class="hidden">
+  <div class="info"><div class="t" id="resT">Einkauf erledigt!</div><div class="s" id="resS"></div></div>
+  <div class="btns"><button class="btn green" data-act="next">Nächstes Level ▶</button><button class="btn grey" data-act="menu">Hauptmenü</button></div>
+</div>
+
+<script>
+/*__THREE__*/
+</script>
+<script>
+/*__GAME__*/
+</script>
+</body>
+</html>
