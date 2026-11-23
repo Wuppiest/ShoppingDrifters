@@ -2371,7 +2371,7 @@ document.addEventListener('pointerlockchange', () => {
 function releaseLock() { if (document.pointerLockElement) { lockByUs = true; document.exitPointerLock(); } }
 
 // ---------- cart physics ----------
-const PHY = { MAXV: 11.2, ACCEL: 8.5, BRAKE: 15, REV: 3, REVACC: 4, GRIP: 4.2, DRIFT_GRIP: 1.2, LOCK_GRIP: 2.6, STEER: 2.55, BOOSTV: 3.5, R: 0.36 };
+const PHY = { MAXV: 11.2, ACCEL: 8.5, BRAKE: 15, REV: 3, REVACC: 4, GRIP: 4.2, DRIFT_GRIP: 1.2, LOCK_GRIP: 2.6, LOCK_BRAKE: 5, STEER: 2.55, BOOSTV: 3.5, R: 0.36 };
 const C = { x: 0, z: 0, h: 0, vx: 0, vz: 0, yawRate: 0, steer: 0, fwd: 0, lat: 0, slip: 0, charge: 0, boostT: 0, puddle: false, wasPuddle: false,
   roll: 0, tip: 0, tipV: 0, tipPeak: 0, pitch: 0, lean: 0, lookYaw: 0, wheelSpin: 0, shake: 0, crashCd: 0, accel: 0, throttle: 0, diceV: 0, dice: 0 };
 function resetCart(x, z, h) {
@@ -2391,7 +2391,7 @@ function physicsStep(dt, ctl) {
   const maxV = PHY.MAXV + (boosting ? PHY.BOOSTV : 0);
   if (up) {
     if (fwd < 0) fwd = Math.min(0, fwd + PHY.BRAKE * dt);
-    else if (fwd < maxV) fwd += PHY.ACCEL * Math.pow(clamp(1 - fwd / maxV, 0, 1), 0.55) * dt;
+    else if (fwd < maxV) fwd += PHY.ACCEL * (lock ? 0.5 : 1) * Math.pow(clamp(1 - fwd / maxV, 0, 1), 0.55) * dt;
   }
   if (down) {
     if (fwd > 0.25) fwd = Math.max(0, fwd - PHY.BRAKE * dt);
@@ -2402,10 +2402,14 @@ function physicsStep(dt, ctl) {
   if (fwd > maxV) fwd = damp(fwd, maxV, 1.5, dt);
   // steering
   const hand = !lock && Math.abs(fwd) > 2.5; // the cart always drives drifty above walking speed
+  if (lock && Math.abs(fwd) > 1) fwd -= Math.sign(fwd) * PHY.LOCK_BRAKE * dt; // rear wheels pulled = moderate brake
   const sp = Math.abs(fwd);
   const sf = clamp(sp / 2.2, 0, 1) * (1 - 0.28 * clamp(sp / PHY.MAXV, 0, 1));
   const target = -C.steer * PHY.STEER * sf * (fwd < -0.1 ? -1 : 1) * (hand ? 1.35 : 1) * (C.puddle ? 0.75 : 1);
-  C.yawRate = damp(C.yawRate, lock ? 0 : target, lock ? 4 : hand ? 5 : 8, dt);
+  // locked: the rear is pulled in behind the direction of travel (cart turns back into line)
+  let lockYaw = 0;
+  if (lock && Math.hypot(C.vx, C.vz) > 1) lockYaw = clamp(angDiff(C.h, Math.atan2(C.vx, C.vz) + (fwd < 0 ? PI : 0)) * 3.2, -2.2, 2.2);
+  C.yawRate = damp(C.yawRate, lock ? lockYaw : target, lock ? 6 : hand ? 5 : 8, dt);
   C.h += C.yawRate * dt;
   // grip: throttle/brake act along the heading, then the direction of travel is pulled towards
   // the (new) heading. The speed is mostly kept → slides and drifts keep their momentum.
