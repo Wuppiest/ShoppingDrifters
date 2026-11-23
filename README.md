@@ -13,13 +13,14 @@ Arbeite die Einkaufsliste so schnell wie möglich ab und drifte danach zur Kasse
 | A / D | Lenken |
 | Leertaste | **Hockey-Stopp** – Räder blockieren: der Wagen rutscht quer weiter, bremst hart und kippt auf zwei Räder; mit A/D dabei die Front weiterdrehen |
 | Shift | **Nitro zünden** – lange driften und geradeziehen füllt die Nitro-Flasche am Lenker, dann hast du 3 Sekunden |
-| E | Produkt einladen (vor dem Regal abbremsen!) |
+| E (halten) | Produkt einladen – geht auch im Vorbeirollen bis 15 km/h; schneller = es fällt runter |
 | Maus / Finger ziehen | Umschauen |
 | Esc / P | Pause |
 
 ## Regeln
 - Oben links läuft die Uhr, oben rechts steht die Einkaufsliste.
 - Fährst du zu lange zu langsam, startet ein Countdown – läuft er ab, ist die Runde vorbei. Die Mindestgeschwindigkeit ist auf dem Tacho rot markiert. Direkt vor einem gesuchten Produkt darfst du anhalten.
+- Schräg an Regalen entlangschrammen (Wall-Ride) kostet kaum Tempo und sprüht Funken – frontal reinkrachen bremst hart.
 - Gesuchte Produkte werden aus der Nähe gelb markiert – die Gang-Schilder verraten, wo was steht.
 - Ist alles eingeladen, ab in eine der Kassen (die Lampen werden grün).
 - Jedes Level wird schwerer: längere Liste, höheres Mindesttempo, und nach und nach Wasserpfützen (ab Level 2), andere Einkäufer (ab Level 3) und umkippende Kartonstapel (ab Level 4).

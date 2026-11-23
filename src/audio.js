@@ -93,9 +93,19 @@ const SFX = (() => {
     s1.connect(smix); s2.connect(smix); ss.connect(sf); sf.connect(sng); sng.connect(sg); smix.connect(sg); sg.connect(sfxBus);
     s1.start(); s2.start(); sv.start(); ss.start();
     L.squeal = { g: sg, s1, s2 };
+    // metal scrape (grinding along a shelf): high band noise + two inharmonic squeaks
+    const ks = ctx.createBufferSource(); ks.buffer = noiseBuf; ks.loop = true;
+    const kf = ctx.createBiquadFilter(); kf.type = 'bandpass'; kf.frequency.value = 3800; kf.Q.value = 2.5;
+    const kg = ctx.createGain(); kg.gain.value = 0;
+    const kt = ctx.createGain(); kt.gain.value = 0.6;
+    const kl = ctx.createOscillator(); kl.frequency.value = 31; const klg = ctx.createGain(); klg.gain.value = 0.4; kl.connect(klg); klg.connect(kt.gain); kl.start();
+    ks.connect(kf); kf.connect(kt); kt.connect(kg);
+    for (const f of [2310, 3170]) { const o = ctx.createOscillator(); o.type = 'square'; o.frequency.value = f; const og = ctx.createGain(); og.gain.value = 0.012; o.connect(og); og.connect(kt); o.start(); }
+    kg.connect(sfxBus); ks.start();
+    L.scrape = { g: kg, f: kf };
   }
   // called every frame
-  function drive(on, speed, throttle, slip, boost) {
+  function drive(on, speed, throttle, slip, boost, scrape = 0) {
     if (!ctx || !L.engine) return;
     const t = now();
     const sp = Math.abs(speed);
@@ -109,6 +119,8 @@ const SFX = (() => {
     const sq = on ? clamp((slip - 0.18) * 0.5, 0, 0.22) * clamp(sp / 4, 0, 1) : 0;
     L.squeal.g.gain.setTargetAtTime(sq, t, 0.04);
     L.squeal.s1.frequency.setTargetAtTime(1000 + sp * 25, t, 0.1);
+    L.scrape.g.gain.setTargetAtTime(on && scrape ? Math.min(0.28, 0.08 + scrape * 0.018) : 0, t, scrape ? 0.02 : 0.08);
+    L.scrape.f.frequency.setTargetAtTime(2800 + scrape * 150, t, 0.05);
   }
 
   // ---------- one-shots ----------

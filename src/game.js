@@ -60,9 +60,9 @@ const riderTP = (() => {
 cart.body.add(riderTP);
 
 // ---------- input ----------
-const input = { up: 0, down: 0, left: 0, right: 0, drift: 0 };
-const KEYMAP = { KeyW: 'up', ArrowUp: 'up', KeyS: 'down', ArrowDown: 'down', KeyA: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right', Space: 'drift' };
-const KEYMAP2 = { w: 'up', s: 'down', a: 'left', d: 'right', ' ': 'drift', arrowup: 'up', arrowdown: 'down', arrowleft: 'left', arrowright: 'right' };
+const input = { up: 0, down: 0, left: 0, right: 0, drift: 0, grab: 0 };
+const KEYMAP = { KeyW: 'up', ArrowUp: 'up', KeyS: 'down', ArrowDown: 'down', KeyA: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right', Space: 'drift', KeyE: 'grab' };
+const KEYMAP2 = { w: 'up', s: 'down', a: 'left', d: 'right', ' ': 'drift', e: 'grab', arrowup: 'up', arrowdown: 'down', arrowleft: 'left', arrowright: 'right' };
 const keyOf = (e) => KEYMAP[e.code] || KEYMAP2[(e.key || '').toLowerCase()];
 window.addEventListener('keydown', (e) => {
   SFX.init();
@@ -70,7 +70,6 @@ window.addEventListener('keydown', (e) => {
   if (k) { input[k] = 1; e.preventDefault(); }
   if (e.repeat) return;
   const key = (e.key || '').toLowerCase();
-  if (e.code === 'KeyE' || key === 'e') onInteract();
   if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || key === 'shift') fireNitro();
   if (e.code === 'Escape' || e.code === 'KeyP' || key === 'escape' || key === 'p') togglePause();
   if ((e.code === 'Enter' || key === 'enter') && G.state === 'checkout' && G.co && G.co.shown) nextLevel();
@@ -105,7 +104,7 @@ document.addEventListener('pointerlockchange', () => {
 function releaseLock() { if (document.pointerLockElement) { lockByUs = true; document.exitPointerLock(); } }
 
 // ---------- cart physics ----------
-const PHY = { MAXV: 11.2, ACCEL: 8.5, BRAKE: 15, REV: 3, REVACC: 4, GRIP: 4.2, DRIFT_GRIP: 1.2, LOCK_BRAKE: 5, LOCK_SIDE_BRAKE: 12, LOCK_TURN: 2.2, STEER: 2.55, BOOSTV: 3.5, NITRO_TIME: 3, R: 0.36 };
+const PHY = { MAXV: 11.2, ACCEL: 8.5, BRAKE: 15, REV: 3, REVACC: 4, GRIP: 4.2, DRIFT_GRIP: 1.2, LOCK_BRAKE: 5, LOCK_SIDE_BRAKE: 12, LOCK_TURN: 2.2, STEER: 2.55, BOOSTV: 3.5, NITRO_TIME: 3, WALLRIDE: 0.55, WALL_FRICTION: 0.35, R: 0.36 };
 const C = { x: 0, z: 0, h: 0, vx: 0, vz: 0, yawRate: 0, steer: 0, fwd: 0, lat: 0, slip: 0, charge: 0, nitro: 0, nitroT: 0, boostT: 0, puddle: false, wasPuddle: false,
   roll: 0, tip: 0, tipV: 0, tipPeak: 0, pitch: 0, lean: 0, lookYaw: 0, wheelSpin: 0, shake: 0, crashCd: 0, accel: 0, throttle: 0, diceV: 0, dice: 0 };
 function resetCart(x, z, h) {
@@ -208,17 +207,24 @@ const _hit = { n: 0, power: 0 };
 function collide(dt) {
   C.crashCd -= dt;
   const fx = Math.sin(C.h), fz = Math.cos(C.h);
-  let impact = 0;
+  let impact = 0, scrape = 0, sn = null, sp0 = null;
   for (const off of [0.27, -0.3]) {
     let cx = C.x + fx * off, cz = C.z + fz * off;
     const r = PHY.R;
-    const resolve = (nx, nz, pen) => {
+    // wall: glancing contact = wall ride (slide along, keep speed, sparks); head-on = hard bounce
+    const resolve = (nx, nz, pen, wall) => {
       C.x += nx * pen; C.z += nz * pen; cx += nx * pen; cz += nz * pen;
-      const vn = C.vx * nx + C.vz * nz;
+      const vn = C.vx * nx + C.vz * nz, spd = Math.hypot(C.vx, C.vz);
+      if (wall && spd > 2) { scrape = Math.max(scrape, spd); sn = [nx, nz]; sp0 = [cx - nx * r, cz - nz * r]; }
       if (vn < 0) {
-        C.vx -= 1.4 * vn * nx; C.vz -= 1.4 * vn * nz; // restitution ~0.4
-        C.vx *= 0.93; C.vz *= 0.93;
-        impact = Math.max(impact, -vn);
+        const steep = -vn / Math.max(spd, 0.01); // sin(angle of incidence)
+        if (wall && steep < PHY.WALLRIDE) {
+          C.vx -= 1.1 * vn * nx; C.vz -= 1.1 * vn * nz; // just lose the part going into the wall
+        } else {
+          C.vx -= 1.4 * vn * nx; C.vz -= 1.4 * vn * nz; // restitution ~0.4
+          C.vx *= 0.8; C.vz *= 0.8;
+          impact = Math.max(impact, -vn);
+        }
       }
     };
     const boxes = (list) => {
@@ -227,18 +233,26 @@ function collide(dt) {
         const px = clamp(cx, b.x0, b.x1), pz = clamp(cz, b.z0, b.z1);
         let dx = cx - px, dz = cz - pz; const d2 = dx * dx + dz * dz;
         if (d2 >= r * r) continue;
-        if (d2 > 1e-9) { const d = Math.sqrt(d2); resolve(dx / d, dz / d, r - d); }
+        if (d2 > 1e-9) { const d = Math.sqrt(d2); resolve(dx / d, dz / d, r - d, true); }
         else { // center inside: push out along the shortest axis
           const l = cx - b.x0, rr = b.x1 - cx, t = cz - b.z0, bb = b.z1 - cz, m = Math.min(l, rr, t, bb);
-          if (m === l) resolve(-1, 0, l + r); else if (m === rr) resolve(1, 0, rr + r); else if (m === t) resolve(0, -1, t + r); else resolve(0, 1, bb + r);
+          if (m === l) resolve(-1, 0, l + r, true); else if (m === rr) resolve(1, 0, rr + r, true); else if (m === t) resolve(0, -1, t + r, true); else resolve(0, 1, bb + r, true);
         }
       }
     };
     boxes(COLS); boxes(DYN_BOXES);
     for (const c of DYN_CIRCLES) {
       const dx = cx - c.x, dz = cz - c.z, d = Math.hypot(dx, dz), rr = r + c.r;
-      if (d < rr && d > 1e-6) { resolve(dx / d, dz / d, rr - d); bumpShopper(c); }
+      if (d < rr && d > 1e-6) { resolve(dx / d, dz / d, rr - d, false); bumpShopper(c); }
     }
+  }
+  C.scrape = scrape > 0 && impact === 0 ? scrape : 0;
+  if (C.scrape) {
+    const k = Math.exp(-PHY.WALL_FRICTION * dt); C.vx *= k; C.vz *= k; // a little friction only
+    // the cart lines itself up with the wall it is grinding along
+    const va = Math.atan2(C.vx, C.vz);
+    if (Math.cos(angDiff(C.h, va)) > 0.3) C.h += angDiff(C.h, va) * (1 - Math.exp(-4 * dt));
+    if (Math.random() < 0.8) spawnSpark(sp0[0], R(0.5, 1.0), sp0[1], sn[0], sn[1], C.vx, C.vz);
   }
   if (impact > 1.6 && C.crashCd <= 0) {
     C.crashCd = 0.25;
@@ -246,6 +260,28 @@ function collide(dt) {
     C.shake = Math.min(1, C.shake + impact / 8);
     C.yawRate += (Math.random() - 0.5) * impact * 0.25;
     spawnPuffs(Math.min(8, 2 + impact), '#ffffff');
+  }
+}
+// sparks while grinding along a shelf
+const sparks = [];
+const sparkGeo = new T.BoxGeometry(0.035, 0.035, 0.16);
+const sparkMat = new T.MeshBasicMaterial({ color: '#ffc23a' }), sparkMat2 = new T.MeshBasicMaterial({ color: '#fff6c0' });
+for (let i = 0; i < 90; i++) { const m = new T.Mesh(sparkGeo, i % 3 ? sparkMat : sparkMat2); m.visible = false; scene.add(m); sparks.push({ m, life: 0, vx: 0, vy: 0, vz: 0 }); }
+let sparkI = 0;
+function spawnSpark(x, y, z, nx, nz, vx, vz) {
+  const s = sparks[sparkI++ % sparks.length];
+  s.m.position.set(x, y, z); s.life = R(0.2, 0.45);
+  s.vx = nx * R(1, 3) + vx * R(0.2, 0.6) + R(-0.5, 0.5); s.vy = R(1, 3); s.vz = nz * R(1, 3) + vz * R(0.2, 0.6) + R(-0.5, 0.5);
+  s.m.visible = true;
+}
+function updateSparks(dt) {
+  for (const s of sparks) {
+    if (s.life <= 0) continue;
+    s.life -= dt; if (s.life <= 0) { s.m.visible = false; continue; }
+    s.vy -= 9 * dt;
+    s.m.position.x += s.vx * dt; s.m.position.y = Math.max(0.01, s.m.position.y + s.vy * dt); s.m.position.z += s.vz * dt;
+    s.m.lookAt(s.m.position.x + s.vx, s.m.position.y + s.vy, s.m.position.z + s.vz);
+    s.m.scale.setScalar(Math.min(1, s.life * 4));
   }
 }
 function fireNitro() {
@@ -358,7 +394,7 @@ function pickList(level) {
 }
 function setupLevel(level) {
   G.level = level; G.cfg = levelCfg(level);
-  G.list = pickList(level); G.got = new Set(); G.time = 0; G.slowT = 0; G.near = null; G.total = 0;
+  G.list = pickList(level); G.got = new Set(); G.missT = {}; G.time = 0; G.slowT = 0; G.near = null; G.total = 0;
   for (const k in G.markers) scene.remove(G.markers[k].g);
   G.markers = {};
   for (const p of G.list) G.markers[p.id] = makeMarker(SPOTS[p.id]);
@@ -459,13 +495,36 @@ function die() {
   show('dead'); show('hud', false); setPrompt(null); show('slow', false);
 }
 function retry() { show('dead', false); show('pause', false); setupLevel(G.level); beginIntro(false); }
-function onInteract() {
-  if (G.state !== 'play' || !G.near) return;
-  const sp = Math.abs(C.fwd);
-  if (sp > 3.6) { SFX.nope(); toast('Zu schnell! Erst bremsen (S)'); return; }
-  pickup(G.near);
+// grabbing: hold E near a wanted product. Slow enough (≤ GRAB_KMH) → it goes into the cart,
+// also while rolling past. Too fast → you knock it off the shelf and it falls on the floor.
+const GRAB_KMH = 15;
+function tryGrab(id) {
+  const kmh = Math.hypot(C.vx, C.vz) * 3.6;
+  if (kmh <= GRAB_KMH) { pickup(id, kmh > 4); return; }
+  if ((G.missT[id] || 0) > G.clock) return;
+  G.missT[id] = G.clock + 1.2;
+  dropProduct(id);
+  SFX.nope(); toast(pick(['Daneben! Zu schnell!', 'Uups – runtergefallen!', 'Langsamer greifen!']), 1200);
 }
-function pickup(id) {
+const fallen = [];
+function dropProduct(id) {
+  const p = PROD[id], sp = SPOTS[id], near = spotDist(sp, C.x, C.z);
+  const m = new T.Mesh(p.geo, VCMAT); m.castShadow = true;
+  m.position.set(near.px - sp.nx * 0.2, sp.y + 0.05, near.pz - sp.nz * 0.2);
+  scene.add(m);
+  fallen.push({ m, vx: C.vx * 0.5 + sp.nx * 1.5, vy: 1.5, vz: C.vz * 0.5 + sp.nz * 1.5, sx: R(-6, 6), sz: R(-6, 6), t: 0 });
+}
+function updateFallen(dt) {
+  for (let i = fallen.length - 1; i >= 0; i--) {
+    const f = fallen[i]; f.t += dt;
+    f.vy -= 14 * dt;
+    f.m.position.x += f.vx * dt; f.m.position.y += f.vy * dt; f.m.position.z += f.vz * dt;
+    if (f.m.position.y < 0) { f.m.position.y = 0; f.vy = -f.vy * 0.3; f.vx *= 0.6; f.vz *= 0.6; f.sx *= 0.5; f.sz *= 0.5; }
+    f.m.rotation.x += f.sx * dt; f.m.rotation.z += f.sz * dt;
+    if (f.t > 4) { const k = 1 - (f.t - 4) / 0.5; f.m.scale.setScalar(Math.max(0.001, k)); if (k <= 0) { scene.remove(f.m); fallen.splice(i, 1); } }
+  }
+}
+function pickup(id, rolling = false) {
   const p = PROD[id], sp = SPOTS[id];
   G.got.add(id);
   G.slowT = -2; // a bit of grace after stopping for a product
@@ -485,7 +544,7 @@ function pickup(id) {
   if (G.got.size === G.list.length) {
     toast('Alles da! Ab zur Kasse! 🛒', 2500); SFX.ding();
     for (const l of LANES) l.lamp.color.set('#5dff7a');
-  } else toast(p.e + ' ' + p.n + ' eingeladen!', 1200);
+  } else toast(p.e + ' ' + p.n + (rolling ? ' im Vorbeifahren geschnappt! 😎' : ' eingeladen!'), 1200);
 }
 function updateItems(dt) {
   const tmp = new V3();
@@ -701,9 +760,10 @@ function updatePlay(dt) {
     G.near = near;
   }
   if (near) {
-    const p = PROD[near];
-    if (sp > 3.6) setPrompt(`Zu schnell für ${p.e} ${p.n}! Bremsen <kbd>S</kbd>`, true);
-    else setPrompt(`<kbd>E</kbd> ${p.e} ${p.n} einladen`);
+    const p = PROD[near], kmh = Math.hypot(C.vx, C.vz) * 3.6;
+    if (kmh > GRAB_KMH) setPrompt(`Zu schnell für ${p.e} ${p.n}! (max. ${GRAB_KMH} km/h)`, true);
+    else setPrompt(`<kbd>E</kbd> ${p.e} ${p.n} ${kmh > 4 ? 'schnappen' : 'einladen'}`);
+    if (input.grab) tryGrab(near);
   } else setPrompt(null);
   // nitro hint
   const nh = $('nitro');
@@ -809,7 +869,7 @@ function frame(now) {
     }
   }
   if (G.state !== 'play') updateHazards(dt, G.clock, 999, 999, 0, null);
-  updatePuffs(dt);
+  updatePuffs(dt); updateSparks(dt); updateFallen(dt);
   // product level of detail: full models only for nearby shelf blocks
   const lodHi = settings.quality === 'high' ? 8 : settings.quality === 'mid' ? 5.5 : 3.5;
   const lodMid = settings.quality === 'high' ? 20 : settings.quality === 'mid' ? 13 : 8;
@@ -826,7 +886,7 @@ function frame(now) {
   sun.position.set(camera.position.x + 5, 14, camera.position.z + 3);
   sun.target.position.set(camera.position.x, 0, camera.position.z);
   const driving = G.state === 'play' || G.state === 'countdown' || G.state === 'outro' || G.state === 'checkout';
-  SFX.drive(driving, G.state === 'checkout' ? 0 : Math.hypot(C.vx, C.vz), C.throttle, G.state === 'play' ? C.slip : 0, C.boostT > 0 ? 1 : 0);
+  SFX.drive(driving, G.state === 'checkout' ? 0 : Math.hypot(C.vx, C.vz), C.throttle, G.state === 'play' ? C.slip : 0, C.boostT > 0 ? 1 : 0, G.state === 'play' ? C.scrape || 0 : 0);
   renderer.render(scene, camera);
 }
 
