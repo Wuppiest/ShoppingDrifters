@@ -104,7 +104,7 @@ document.addEventListener('pointerlockchange', () => {
 function releaseLock() { if (document.pointerLockElement) { lockByUs = true; document.exitPointerLock(); } }
 
 // ---------- cart physics ----------
-const PHY = { MAXV: 11.2, ACCEL: 8.5, BRAKE: 15, REV: 3, REVACC: 4, GRIP: 4.2, DRIFT_GRIP: 1.2, STEER: 2.55, BOOSTV: 3.5, R: 0.36 };
+const PHY = { MAXV: 11.2, ACCEL: 8.5, BRAKE: 15, REV: 3, REVACC: 4, GRIP: 4.2, DRIFT_GRIP: 1.2, LOCK_GRIP: 7, STEER: 2.55, BOOSTV: 3.5, R: 0.36 };
 const C = { x: 0, z: 0, h: 0, vx: 0, vz: 0, yawRate: 0, steer: 0, fwd: 0, lat: 0, slip: 0, charge: 0, boostT: 0, puddle: false, wasPuddle: false,
   roll: 0, pitch: 0, lean: 0, lookYaw: 0, wheelSpin: 0, shake: 0, crashCd: 0, accel: 0, throttle: 0, diceV: 0, dice: 0 };
 function resetCart(x, z, h) {
@@ -115,7 +115,9 @@ function physicsStep(dt, ctl) {
   const fx = Math.sin(C.h), fz = Math.cos(C.h), rx = -Math.cos(C.h), rz = Math.sin(C.h);
   let fwd = C.vx * fx + C.vz * fz, lat = C.vx * rx + C.vz * rz;
   const fwd0 = fwd;
-  const up = ctl ? input.up : 0, down = ctl ? input.down : 0, steerIn = ctl ? input.right - input.left : 0;
+  // space = lock the wheels straight: no steering, lots of grip → pulls you out of a drift
+  const lock = ctl && input.drift;
+  const up = ctl ? input.up : 0, down = ctl ? input.down : 0, steerIn = ctl && !lock ? input.right - input.left : 0;
   C.throttle = up;
   C.steer = damp(C.steer, steerIn, 9, dt);
   const boosting = C.boostT > 0;
@@ -132,12 +134,11 @@ function physicsStep(dt, ctl) {
   if (boosting) { C.boostT -= dt; fwd = Math.min(maxV, fwd + 14 * dt); }
   if (fwd > maxV) fwd = damp(fwd, maxV, 1.5, dt);
   // steering
-  const hand = ctl && input.drift && Math.abs(fwd) > 2.5;
-  if (hand) fwd -= Math.sign(fwd) * 0.45 * dt;
+  const hand = !lock && Math.abs(fwd) > 2.5; // the cart always drives drifty above walking speed
   const sp = Math.abs(fwd);
   const sf = clamp(sp / 2.2, 0, 1) * (1 - 0.28 * clamp(sp / PHY.MAXV, 0, 1));
   const target = -C.steer * PHY.STEER * sf * (fwd < -0.1 ? -1 : 1) * (hand ? 1.35 : 1) * (C.puddle ? 0.75 : 1);
-  C.yawRate = damp(C.yawRate, target, hand ? 5 : 8, dt);
+  C.yawRate = damp(C.yawRate, lock ? 0 : target, lock ? 12 : hand ? 5 : 8, dt);
   C.h += C.yawRate * dt;
   // grip: throttle/brake act along the heading, then the direction of travel is pulled towards
   // the (new) heading. The speed is mostly kept → slides and drifts keep their momentum.
@@ -145,10 +146,10 @@ function physicsStep(dt, ctl) {
   let spd = Math.hypot(vx, vz);
   if (spd > 0.05) {
     const th = C.h + (fwd < 0 ? PI : 0);
-    let grip = hand ? PHY.DRIFT_GRIP : PHY.GRIP;
+    let grip = lock ? PHY.LOCK_GRIP : hand ? PHY.DRIFT_GRIP : PHY.GRIP;
     if (C.puddle) grip *= 0.2;
     let d = angDiff(Math.atan2(vx, vz), th) * Math.exp(-grip * dt); // remaining slip angle
-    const maxSlip = C.puddle ? 1.3 : hand ? 0.95 : 0.7;
+    const maxSlip = C.puddle ? 1.3 : lock ? 0.7 : hand ? 0.95 : 0.7;
     d = clamp(d, -maxSlip, maxSlip);
     spd -= spd * Math.abs(d) * (hand ? 0.22 : 0.35) * dt;
     if (spd > maxV) spd = damp(spd, maxV, 2.5, dt);
@@ -161,10 +162,10 @@ function physicsStep(dt, ctl) {
   C.fwd = vx * nfx + vz * nfz; C.lat = vx * -nfz + vz * nfx;
   C.accel = (C.fwd - fwd0) / dt;
   C.slip = Math.atan2(Math.abs(C.lat), Math.max(Math.abs(C.fwd), 0.5));
-  // mini turbo: hold space while drifting, release for a boost
-  if (hand && C.slip > 0.15 && sp > 4) C.charge += dt;
-  else if (!(ctl && input.drift)) {
-    if (C.charge > 0.75) { C.boostT = 0.55 + Math.min(C.charge, 2.2) * 0.35; SFX.boost(); flash($('turbo'), 900); spawnPuffs(4, '#9ff6ff'); }
+  // mini turbo: drift long enough, then straighten out (by itself or with space) for a boost
+  if (hand && C.slip > 0.25 && sp > 4) C.charge += dt;
+  else if (C.slip < 0.12 || sp < 2) {
+    if (C.charge > 1.0 && sp >= 2) { C.boostT = 0.55 + Math.min(C.charge, 2.5) * 0.3; SFX.boost(); flash($('turbo'), 900); spawnPuffs(4, '#9ff6ff'); }
     C.charge = 0;
   }
   collide(dt);
@@ -604,7 +605,7 @@ function updateCartVisual(dt, engineOn) {
   C.wheelSpin += (C.fwd * dt) / 0.08;
   for (const w of cart.wheels) w.rotation.x = C.wheelSpin;
   // flames
-  const blue = C.boostT > 0 || C.charge > 0.75;
+  const blue = C.boostT > 0 || C.charge > 1.0;
   const fl = engineOn ? (C.boostT > 0 ? 1.6 : C.throttle ? 1 : 0.25) : 0;
   cart.flameMat.color.set(blue ? '#3aa8ff' : '#ff8a1f'); cart.flameCore.color.set(blue ? '#d8f6ff' : '#fff3a0');
   for (const f of cart.flames) { const s = fl * (0.8 + Math.random() * 0.4); f.visible = s > 0.05; f.scale.set(1, 1, Math.max(0.01, s)); }

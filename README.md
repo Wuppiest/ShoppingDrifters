@@ -11,7 +11,8 @@ Arbeite die Einkaufsliste so schnell wie möglich ab und drifte danach zur Kasse
 | W | Gas |
 | S | Bremsen / Rückwärts |
 | A / D | Lenken |
-| Leertaste | Stärker driften – lange driften und loslassen = **Turbo** |
+| Leertaste | Räder blockieren (geradeaus) – rettet dich aus einem Drift |
+| | Der Wagen driftet von selbst – lange driften und dann geradeziehen = **Turbo** |
 | E | Produkt einladen (vor dem Regal abbremsen!) |
 | Maus / Finger ziehen | Umschauen |
 | Esc / P | Pause |
