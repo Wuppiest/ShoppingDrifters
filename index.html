@@ -71,6 +71,21 @@
   #nitro.late { border-color: #ff5a3a; box-shadow: 0 0 18px rgba(255,90,58,.6); animation: nshake .15s infinite; }
   #nitro.late .t { color: #ff8a6a; } #nitro.late .bar div { background: #ff5a3a; }
   @keyframes nshake { 0%,100% { transform: translateX(-50%); } 50% { transform: translateX(calc(-50% + 3px)); } }
+  #style { position: absolute; top: max(14px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); text-align: center; }
+  #style .row { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; background: rgba(15,18,28,.6); border: 2px solid rgba(255,255,255,.18); border-radius: 14px; font-size: 24px; font-weight: 900; font-variant-numeric: tabular-nums; }
+  #style.bump .row { animation: sbump .3s; }
+  @keyframes sbump { 0% { transform: scale(1.18); } 100% { transform: scale(1); } }
+  #styleMult { padding: 1px 8px; border-radius: 8px; font-size: 18px; background: #2bb24a; }
+  #styleLive { margin-top: 4px; font-size: 15px; font-weight: 900; color: #ffd21f; letter-spacing: 1px; min-height: 18px; text-shadow: 0 2px 4px rgba(0,0,0,.6); }
+  #stylePops { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  #stylePops .pop { font-size: 17px; font-weight: 800; color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,.7); animation: spop 2.6s forwards; }
+  #stylePops .pop b { color: #ffd21f; } #stylePops .pop i { color: #4ff2ff; font-style: normal; }
+  #stylePops .pop.bad { color: #ff6a6a; }
+  @keyframes spop { 0% { transform: translateY(-6px) scale(1.2); opacity: 0; } 12% { transform: none; opacity: 1; } 75% { opacity: 1; } 100% { opacity: 0; } }
+  #announce { position: absolute; top: calc(max(14px, env(safe-area-inset-top)) + 150px); left: 50%; transform: translate(-50%, -20px); max-width: min(620px, 70vw); padding: 10px 18px; background: rgba(255,250,225,.95); color: #2b2210; border: 3px solid #f2c200; border-radius: 14px; font-size: 16px; font-weight: 700; text-align: center; opacity: 0; transition: opacity .4s, transform .4s; }
+  #announce.show { opacity: 1; transform: translate(-50%, 0); }
+  #items li.moved { color: #e0408a; font-weight: 900; }
+  #items li.moved::after { content: '📢'; margin-left: 2px; }
   #vignette { position: absolute; inset: 0; box-shadow: inset 0 0 160px rgba(255,0,0,.0); transition: box-shadow .2s; }
 
   #count { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); z-index: 8; font-size: 160px; font-weight: 900; pointer-events: none; color: #ffe066; text-shadow: 0 6px 0 #a5560f, 0 0 40px rgba(0,0,0,.5); }
@@ -182,6 +197,8 @@
   <div id="slow" class="hidden shadow"><div class="t">ZU LANGSAM!</div><div class="n" id="slowN">5</div><div class="s" id="slowS">Gib Gas!</div></div>
   <div id="toast" class="shadow"></div>
   <div id="turbo">TURBO!</div>
+  <div id="style"><div class="row"><span class="star">⭐</span><span id="styleNum">0</span><span id="styleMult" class="hidden">x2</span></div><div id="styleLive"></div><div id="stylePops"></div></div>
+  <div id="announce"></div>
   <div id="nitro" class="hidden"><div class="t"><kbd>Shift</kbd> NITRO ZÜNDEN!</div><div class="bar"><div id="nitroBar"></div></div></div>
 </div>
 <div id="touch">
@@ -1602,6 +1619,7 @@ let SECTIONS = WORLDS.std.sections;
 let CUR_WORLD = WORLDS.std;
 let WORLD_IDS = [];
 const SPOTS = {};       // productId → pickup spot
+let ORIG_SPOTS = {};    // copy of the spots right after building (products can get moved during a level)
 const LANES = [];       // checkout lanes
 const STORE_ANIM = {};
 const PRODUCT_LOD = []; // product chunks with 3 levels of detail
@@ -2069,7 +2087,7 @@ function buildStore(scene, W) {
         im.visible = false;
         scene.add(im); return im;
       };
-      PRODUCT_LOD.push({ hi: mk(p.geo), mid: mk(p.geoMid), lo: mk(p.geoLo), x: c.x / c.list.length, z: c.z / c.list.length });
+      PRODUCT_LOD.push({ hi: mk(p.geo), mid: mk(p.geoMid), lo: mk(p.geoLo), x: c.x / c.list.length, z: c.z / c.list.length, id: p.id, mats: c.list });
     }
   }
 
@@ -2078,6 +2096,7 @@ function buildStore(scene, W) {
   const walls = flat.build(VCMAT); walls.receiveShadow = true; scene.add(walls);
 
   buildSigns(scene, coolers, W);
+  ORIG_SPOTS = Object.assign({}, SPOTS);
 }
 
 let PRICE_UV = [];
@@ -2622,12 +2641,19 @@ function levelCfg(n) {
     puddles: n >= 2 ? Math.min(3 + (n - 2) * 2, 12) : 0,
     shoppers: n >= 3 ? Math.min(3 + (n - 3) * 2, 14) : 0,
     towers: n >= 4 ? Math.min(2 + (n - 4), 7) : 0,
+    jacks: n >= 5 ? Math.min(1 + Math.floor((n - 5) / 2), 3) : 0,      // workers with pallet jacks
+    pallets: n >= 5 ? Math.min(2 + (n - 5), 6) : 0,                     // pallets parked in the aisles
+    cleaners: n >= 6 ? Math.min(1 + Math.floor((n - 6) / 3), 2) : 0,   // scrubber machine leaving a wet trail
+    kids: n >= 7 ? Math.min(2 + (n - 7), 5) : 0,
+    omas: n >= 7 ? (n >= 10 ? 2 : 1) : 0,                               // hitting her = time penalty
+    wander: n >= 8 ? Math.min(1 + Math.floor((n - 8) / 2), 3) : 0,     // products get moved
+    lightsOut: n >= 9,
   };
 }
 function clearHazards(scene) {
   if (HZ.group) scene.remove(HZ.group);
   HZ.group = new T.Group(); scene.add(HZ.group);
-  HZ.puddles = []; HZ.shoppers = []; HZ.towers = [];
+  HZ.puddles = []; HZ.shoppers = []; HZ.towers = []; HZ.trail = [];
   DYN_BOXES.length = 0; DYN_CIRCLES.length = 0;
 }
 let WET_UV = null;
@@ -2680,9 +2706,78 @@ function setupHazards(scene, level) {
     let path;
     if (rng() < 0.75) { const s = aisleSpot(); const x = s.A.cx + R(-1.4, 1.4); path = { ax: x, az: s.za + 0.8, bx: x, bz: s.zb - 0.8 }; }
     else { const z = rng() < 0.5 ? 29 : 46.3; path = { ax: R(-27, -5), az: z, bx: R(5, 27), bz: z }; }
-    const sh = { p, path, t: rng(), dir: rng() < 0.5 ? 1 : -1, speed: R(0.9, 1.4), turn: 0, bump: 0, col: { x: 0, z: 0, r: 0.7 } };
+    const sh = { kind: 'shopper', p, path, t: rng(), dir: rng() < 0.5 ? 1 : -1, speed: R(0.9, 1.4), turn: 0, bump: 0, col: { x: 0, z: 0, r: 0.7 } };
     sh.len = Math.hypot(path.bx - path.ax, path.bz - path.az);
     HZ.group.add(p.g); HZ.shoppers.push(sh); DYN_CIRCLES.push(sh.col);
+  }
+  const pathFor = (aislesOnly) => {
+    if (aislesOnly || rng() < 0.7) { const s = aisleSpot(); const x = s.A.cx + R(-1.2, 1.2); return { ax: x, az: s.za + 0.8, bx: x, bz: s.zb - 0.8 }; }
+    const z = rng() < 0.5 ? 29 : 46.3; return { ax: R(-27, -5), az: z, bx: R(5, 27), bz: z };
+  };
+  const addMover = (kind, p, path, speed, r, extra = {}) => {
+    const sh = Object.assign({ kind, p, path, t: rng(), dir: rng() < 0.5 ? 1 : -1, speed, turn: 0, bump: 0, col: { x: 0, z: 0, r } }, extra);
+    sh.len = Math.hypot(path.bx - path.ax, path.bz - path.az);
+    HZ.group.add(p.g); HZ.shoppers.push(sh); DYN_CIRCLES.push(sh.col); if (sh.col2) DYN_CIRCLES.push(sh.col2);
+    return sh;
+  };
+  // ---- workers pulling pallet jacks ----
+  const palletLoad = (o, x, z, ry = 0) => {
+    const t = new Obj();
+    t.box(1.2, 0.14, 0.8, 0, 0.07, 0, '#b88a50');
+    for (const zz of [-0.32, 0, 0.32]) t.box(1.2, 0.03, 0.12, 0, 0.155, zz, '#c8a06a');
+    for (let k = 0; k < 4; k++) t.box(0.55, 0.38, 0.38, (k % 2 ? 0.28 : -0.28), 0.36 + Math.floor(k / 2) * 0.4, 0, ['#c8914a', '#b97b3a', '#d9a253', '#c8914a'][k]);
+    for (const x of [-0.3, 0.3]) t.box(0.04, 0.84, 0.8, x, 0.58, 0, '#f4f4f4'); // straps
+    t.box(1.14, 0.03, 0.78, 0, 0.98, 0, '#f4f4f4');
+    o.put(t, x, 0, z, ry);
+  };
+  for (let i = 0; i < cfg.jacks; i++) {
+    const p = buildPerson('#ff8a1f', '#2b3550', pick(HAIR), pick(SKINS), { style: 'cap', capColor: '#1d2230', jacket: null, logo: '#f2ff3a' });
+    const jo = new Obj();
+    jo.box(0.12, 0.06, 1.2, -0.25, 0.04, -1.1, '#d6262b'); jo.box(0.12, 0.06, 1.2, 0.25, 0.04, -1.1, '#d6262b');
+    jo.box(0.6, 0.25, 0.2, 0, 0.15, -0.45, '#d6262b'); jo.cyl(0.02, 1.0, 0, 0.6, -0.25, '#1d2230', { rx: 0.6, seg: 6 });
+    palletLoad(jo, 0, -1.15, PI / 2);
+    const m = new MeshAcc().addObj(jo).build(VCMAT); m.castShadow = true; p.g.add(m);
+    p.arms[1].rotation.x = 0.5; p.arms[0].rotation.x = 0.3;
+    addMover('jack', p, pathFor(false), R(1.3, 1.7), 0.4, { col2: { x: 0, z: 0, r: 0.75 }, back: 1.15 });
+  }
+  // ---- parked pallets half blocking an aisle ----
+  for (let i = 0; i < cfg.pallets; i++) {
+    const s = aisleSpot(), side = rng() < 0.5 ? -1 : 1;
+    const x = side < 0 ? s.A.x0 + 0.65 : s.A.x1 - 0.65, z = R(s.za + 2, s.zb - 2);
+    const po = new Obj(); palletLoad(po, 0, 0, PI / 2);
+    const m = new MeshAcc().addObj(po).build(VCMAT); m.position.set(x, 0, z); m.castShadow = true; HZ.group.add(m);
+    addCol(x - 0.42, z - 0.62, x + 0.42, z + 0.62, DYN_BOXES);
+  }
+  // ---- floor scrubber leaving a wet trail ----
+  for (let i = 0; i < cfg.cleaners; i++) {
+    const g = new T.Group(), co = new Obj();
+    co.box(0.9, 0.55, 1.3, 0, 0.38, 0, '#2a62c9'); co.box(0.92, 0.08, 1.32, 0, 0.66, 0, '#ffd21f');
+    co.box(1.0, 0.1, 0.5, 0, 0.08, 0.55, '#1d2230'); co.box(0.5, 0.35, 0.4, 0, 0.85, -0.35, '#1d2230');
+    co.box(0.45, 0.08, 0.4, 0, 0.72, -0.15, '#3a3f4a'); co.cyl(0.05, 0.4, 0, 0.9, 0.35, '#1d2230', { rx: -0.5, seg: 6 }); co.torus(0.13, 0.15, 0, 1.08, 0.45, '#1d2230', { rx: -1.1, seg: 10 });
+    for (const sx of [-0.4, 0.4]) co.cyl(0.13, 0.08, sx, 0.13, -0.45, '#222', { rz: PI / 2, seg: 10 });
+    co.cyl(0.06, 0.1, 0.3, 1.0, -0.5, '#ff8a1f', { seg: 8 }); // warning light
+    const cm = new MeshAcc().addObj(co).build(VCMAT); cm.castShadow = true; g.add(cm);
+    const driver = buildPerson('#1aa39a', '#2b3550', pick(HAIR), pick(SKINS), { style: 'cap', capColor: '#1aa39a' });
+    driver.g.position.set(0, -0.15, -0.15); driver.legs.forEach((l) => (l.rotation.x = -1.3)); driver.arms.forEach((a) => (a.rotation.x = -1.0)); g.add(driver.g);
+    const brush = new T.Mesh(new T.CylinderGeometry(0.45, 0.45, 0.05, 12), new T.MeshLambertMaterial({ color: '#3a3f4a' })); brush.position.set(0, 0.04, 0.3); g.add(brush);
+    addMover('cleaner', { g, legs: [], arms: [] }, pathFor(false), R(1.0, 1.3), 0.85, { brush, lastDrop: null });
+  }
+  // ---- kids running around ----
+  for (let i = 0; i < cfg.kids; i++) {
+    const p = buildPerson(pick(['#ff4fa8', '#4ff2ff', '#ffd21f', '#2bd45a', '#ff8a1f']), pick(PANTS), pick(HAIR), pick(SKINS), { jacket: null });
+    p.g.scale.setScalar(0.62);
+    const sh = addMover('kid', p, { ax: 0, az: 0, bx: 0, bz: 1 }, R(2.4, 3.2), 0.35, { tx: 0, tz: 0, x: 0, z: 0 });
+    const s0 = aisleSpot(); sh.x = s0.A.cx; sh.z = R(s0.za, s0.zb); sh.tx = sh.x; sh.tz = sh.z;
+  }
+  // ---- grandma with walker (don't hit her!) ----
+  for (let i = 0; i < cfg.omas; i++) {
+    const p = buildPerson('#8a6bd6', '#555b66', '#d9d9d9', '#f0c29a', { style: 'bun', glasses: true, jacket: null, logo: null, shoe: '#6b4226' });
+    const wo = new Obj();
+    for (const sx of [-0.22, 0.22]) { wo.box(0.03, 0.85, 0.03, sx, 0.43, 0.55, '#c8ccd0'); wo.box(0.03, 0.85, 0.03, sx, 0.43, 0.25, '#c8ccd0'); wo.cyl(0.05, 0.03, sx, 0.05, 0.55, '#222', { rz: PI / 2, seg: 8 }); wo.cyl(0.035, 0.12, sx, 0.85, 0.4, '#1d2230', { rx: PI / 2, seg: 6 }); }
+    wo.box(0.47, 0.03, 0.03, 0, 0.85, 0.55, '#c8ccd0'); wo.box(0.4, 0.2, 0.25, 0, 0.55, 0.4, '#d6262b'); // basket
+    const m = new MeshAcc().addObj(wo).build(VCMAT); m.castShadow = true; p.g.add(m);
+    p.arms[0].rotation.x = p.arms[1].rotation.x = -0.9;
+    addMover('oma', p, pathFor(true), R(0.45, 0.6), 0.6);
   }
   // ---- wobbly display towers that topple when you come close ----
   for (let i = 0; i < cfg.towers; i++) {
@@ -2707,23 +2802,63 @@ function setupHazards(scene, level) {
 }
 function puddleAt(x, z) {
   for (const p of HZ.puddles) { const dx = (x - p.x) / p.rx, dz = (z - p.z) / p.rz; if (dx * dx + dz * dz < 1) return true; }
+  for (const p of HZ.trail) if (p.life > 1.5 && (x - p.x) ** 2 + (z - p.z) ** 2 < p.r * p.r) return true;
   return false;
+}
+const trailGeo = new T.CircleGeometry(1, 12);
+function dropTrail(x, z) {
+  const mat = puddleMat.clone(); mat.opacity = 0.5;
+  const m = new T.Mesh(trailGeo, mat); m.rotation.x = -PI / 2; m.position.set(x, 0.011, z); m.scale.set(0.8, 0.8, 1);
+  HZ.group.add(m); HZ.trail.push({ x, z, r: 0.75, life: 14, m });
 }
 function updateHazards(dt, time, cx, cz, speed, onFall) {
   for (const sh of HZ.shoppers) {
     if (sh.bump > 0) sh.bump -= dt;
-    if (sh.turn > 0) { sh.turn -= dt; if (sh.turn <= 0) sh.dir *= -1; }
-    else if (sh.bump <= 0) {
-      sh.t += (sh.dir * sh.speed * dt) / sh.len;
-      if (sh.t > 1 || sh.t < 0) { sh.t = clamp(sh.t, 0, 1); sh.turn = 0.8; }
+    let x, z, yaw;
+    if (sh.kind === 'kid') { // run from one random spot to the next
+      if (sh.bump <= 0) {
+        if (!sh.way || !sh.way.length) { // new target: always walk via the cross aisles (never through shelves)
+          const a = AISLES[RI(0, 6)], tx = a.cx + R(-1.4, 1.4), tz = rng() < 0.5 ? pick([12, 29, 46.3]) : R(HALVES[RI(0, 1)][0] + 1, HALVES[1][1] - 1);
+          const cross = [12, 29, 46.3].reduce((b, c) => (Math.abs(c - sh.z) < Math.abs(b - sh.z) ? c : b), 12);
+          const tcross = [12, 29, 46.3].reduce((b, c) => (Math.abs(c - tz) < Math.abs(b - tz) ? c : b), 12);
+          sh.way = Math.abs(tx - sh.x) > 2.5 ? [[sh.x, cross], [tx, cross], [tx, tcross], [tx, tz]] : [[tx, tz]];
+        }
+        const [wx, wz] = sh.way[0], dx = wx - sh.x, dz = wz - sh.z, d = Math.hypot(dx, dz);
+        if (d < 0.3) sh.way.shift();
+        else { const st = Math.min(d, sh.speed * dt); sh.x += (dx / d) * st; sh.z += (dz / d) * st; sh.yaw = Math.atan2(dx, dz); }
+      }
+      x = sh.x; z = sh.z; yaw = sh.yaw || 0;
+    } else {
+      if (sh.turn > 0) { sh.turn -= dt; if (sh.turn <= 0) sh.dir *= -1; }
+      else if (sh.bump <= 0) {
+        sh.t += (sh.dir * sh.speed * dt) / sh.len;
+        if (sh.t > 1 || sh.t < 0) { sh.t = clamp(sh.t, 0, 1); sh.turn = sh.kind === 'oma' ? 2.0 : 0.8; }
+      }
+      const { path } = sh; x = lerp(path.ax, path.bx, sh.t); z = lerp(path.az, path.bz, sh.t);
+      yaw = Math.atan2((path.bx - path.ax) * sh.dir, (path.bz - path.az) * sh.dir);
+      const tt = sh.kind === 'oma' ? 2.0 : 0.8;
+      if (sh.turn > 0) yaw += PI * (1 - sh.turn / tt);
     }
-    const { path } = sh, x = lerp(path.ax, path.bx, sh.t), z = lerp(path.az, path.bz, sh.t);
-    let yaw = Math.atan2((path.bx - path.ax) * sh.dir, (path.bz - path.az) * sh.dir);
-    if (sh.turn > 0) yaw += PI * (1 - sh.turn / 0.8);
     sh.p.g.position.set(x, 0, z); sh.p.g.rotation.y = yaw;
-    const walk = sh.turn > 0 || sh.bump > 0 ? 0 : Math.sin(time * 6 * sh.speed) * 0.5;
-    sh.p.legs[0].rotation.x = walk; sh.p.legs[1].rotation.x = -walk;
-    sh.col.x = x + Math.sin(yaw) * 0.45; sh.col.z = z + Math.cos(yaw) * 0.45;
+    const moving = !(sh.turn > 0 || sh.bump > 0);
+    const freq = sh.kind === 'kid' ? 16 : sh.kind === 'oma' ? 4 : 6 * sh.speed;
+    const walk = moving ? Math.sin(time * freq) * (sh.kind === 'kid' ? 0.9 : sh.kind === 'oma' ? 0.25 : 0.5) : 0;
+    if (sh.p.legs.length) { sh.p.legs[0].rotation.x = walk; sh.p.legs[1].rotation.x = -walk; }
+    if (sh.kind === 'kid') { sh.p.arms[0].rotation.x = -walk; sh.p.arms[1].rotation.x = walk; }
+    const fx = Math.sin(yaw), fz = Math.cos(yaw);
+    if (sh.kind === 'jack') { sh.col.x = x; sh.col.z = z; sh.col2.x = x - fx * sh.back; sh.col2.z = z - fz * sh.back; }
+    else if (sh.kind === 'shopper' || sh.kind === 'oma') { sh.col.x = x + fx * 0.45; sh.col.z = z + fz * 0.45; }
+    else { sh.col.x = x; sh.col.z = z; }
+    if (sh.kind === 'cleaner') {
+      sh.brush.rotation.y += dt * 12;
+      if (moving && (!sh.lastDrop || Math.hypot(x - sh.lastDrop[0], z - sh.lastDrop[1]) > 0.7)) { sh.lastDrop = [x, z]; dropTrail(x - fx * 0.5, z - fz * 0.5); }
+    }
+  }
+  // wet trail dries up
+  for (let i = HZ.trail.length - 1; i >= 0; i--) {
+    const p = HZ.trail[i]; p.life -= dt;
+    p.m.material.opacity = 0.5 * clamp(p.life / 3, 0, 1);
+    if (p.life <= 0) { HZ.group.remove(p.m); p.m.material.dispose(); HZ.trail.splice(i, 1); }
   }
   for (const tw of HZ.towers) {
     if (tw.state === 0) {
@@ -2890,6 +3025,9 @@ const SFX = (() => {
     boost() { noise({ dur: 0.5, v: 0.25, type: 'bandpass', f0: 400, f1: 3000, q: 1.5 }); tone({ type: 'sawtooth', f0: 120, f1: 380, dur: 0.4, v: 0.08, filter: 1500 }); },
     nitroReady() { tone({ type: 'triangle', f0: 880, f1: 1760, dur: 0.18, v: 0.12 }); noise({ dur: 0.25, v: 0.08, type: 'highpass', f0: 4000, delay: 0.05 }); },
     hiss() { noise({ dur: 0.7, v: 0.18, type: 'highpass', f0: 3000, f1: 1200, a: 0.02 }); },
+    style(m) { tone({ type: 'triangle', f0: 600 + m * 120, f1: 900 + m * 160, dur: 0.12, v: 0.08 }); },
+    gong() { tone({ type: 'sine', f0: 659, dur: 0.9, v: 0.14 }); tone({ type: 'sine', f0: 523, dur: 1.2, v: 0.14, delay: 0.45 }); },
+    power(on) { if (on) tone({ type: 'sawtooth', f0: 60, f1: 120, dur: 0.6, v: 0.1, filter: 800 }); else { tone({ type: 'sawtooth', f0: 120, f1: 40, dur: 0.8, v: 0.12, filter: 800 }); noise({ dur: 0.3, v: 0.2, type: 'bandpass', f0: 2000, q: 2 }); } },
     splash() { noise({ dur: 0.35, v: 0.2, type: 'bandpass', f0: 2500, f1: 700, q: 1 }); },
     hey() { tone({ type: 'sawtooth', f0: 260, f1: 340, dur: 0.18, v: 0.06, filter: 1200 }); tone({ type: 'sawtooth', f0: 340, f1: 220, dur: 0.22, v: 0.06, delay: 0.18, filter: 1200 }); },
     rumble() { noise({ dur: 1.0, v: 0.3, f0: 300, f1: 60 }); for (let i = 0; i < 5; i++) noise({ dur: 0.12, v: 0.2, f0: 1200, delay: 0.2 + i * 0.12 }); },
@@ -3213,6 +3351,7 @@ function collide(dt) {
   }
   if (impact > 1.6 && C.crashCd <= 0) {
     C.crashCd = 0.25;
+    if (impact > 3) breakCombo();
     SFX.crash(impact / 7);
     C.shake = Math.min(1, C.shake + impact / 8);
     C.yawRate += (Math.random() - 0.5) * impact * 0.25;
@@ -3244,6 +3383,7 @@ function updateSparks(dt) {
 function fireNitro() {
   if (G.state !== 'play' || C.nitro <= 0) return;
   C.boostT = C.nitro; C.nitro = 0; C.nitroT = 0;
+  if (C.slip > 0.3) STY.add('NITRO-DRIFT', 120); else STY.add('NITRO', 30);
   SFX.boost(); flash($('turbo'), 900); spawnPuffs(5, '#9ff6ff'); C.shake = Math.min(1, C.shake + 0.3);
 }
 function nitroPuff() { // pressure escapes from the valve
@@ -3251,7 +3391,17 @@ function nitroPuff() { // pressure escapes from the valve
   for (let i = 0; i < 6; i++) spawnPuff(p.x, p.y, p.z, R(-0.6, 0.6), R(0.6, 1.4), R(-0.6, 0.6), 0.7, 0.04, '#e6f7ff');
 }
 function bumpShopper(c) {
-  for (const sh of HZ.shoppers) if (sh.col === c && sh.bump <= 0) { sh.bump = 1.2; SFX.hey(); toast(pick(['Hey! Pass doch auf!', 'Rowdy!', 'Unverschämtheit!', 'Mein Joghurt!!'])); }
+  for (const sh of HZ.shoppers) {
+    if ((sh.col !== c && sh.col2 !== c) || sh.bump > 0) continue;
+    sh.bump = sh.kind === 'oma' ? 2.5 : 1.2;
+    if (sh.kind === 'oma') {
+      G.time += 5; SFX.nope(); SFX.hey(); C.shake = Math.min(1, C.shake + 0.5); breakCombo();
+      toast('👵 Oma angefahren! +5 Sek. Strafe', 2200);
+    } else {
+      SFX.hey();
+      toast(pick({ kid: ['Mamaaa!', 'Hihi, nochmal!', 'Aua!'], jack: ['Vorsicht, Palette!', 'Hey, ich arbeite hier!'], cleaner: ['Ich hab hier grad gewischt!', 'Pass auf, nass!'] }[sh.kind] || ['Hey! Pass doch auf!', 'Rowdy!', 'Unverschämtheit!', 'Mein Joghurt!!']));
+    }
+  }
 }
 
 // ---------- effects: puffs + skid marks ----------
@@ -3363,6 +3513,7 @@ function setupLevel(level) {
   resetCart(START.x, START.z, START.h);
   cart.drawDial(G.cfg.minKmh);
   for (const l of LANES) { l.lamp.color.set('#ff6a6a'); drawScreen(l, '', ''); }
+  STY.reset(); EV.reset(G.cfg);
   renderList();
   $('lvl').textContent = 'LEVEL ' + level;
 }
@@ -3509,6 +3660,7 @@ function pickup(id, rolling = false) {
     toast('Alles da! Ab zur Kasse! 🛒', 2500); SFX.ding();
     for (const l of LANES) l.lamp.color.set('#5dff7a');
   } else toast(p.e + ' ' + p.n + (rolling ? ' im Vorbeifahren geschnappt! 😎' : ' eingeladen!'), 1200);
+  if (rolling) STY.add('IM VORBEIFAHREN', 150 + Math.round(Math.hypot(C.vx, C.vz) * 3.6 * 8));
 }
 function updateItems(dt) {
   const tmp = new V3();
@@ -3534,7 +3686,10 @@ function startCheckout(lane) {
   G.lane = lane;
   const best = bests[bestKey()];
   G.isRecord = !best || G.time < best;
-  if (G.isRecord) { bests[bestKey()] = G.time; saveJ('sd_bests', bests); }
+  if (G.isRecord) { bests[bestKey()] = G.time; }
+  G.style = STY.score; G.styleRecord = G.style > (bests[bestKey() + '_s'] || 0);
+  if (G.styleRecord) bests[bestKey() + '_s'] = G.style;
+  saveJ('sd_bests', bests);
   G.co = { t: 0, from: { x: C.x, z: C.z, h: C.h }, h: Math.cos(C.h) < 0 ? PI : 0, camFrom: camera.position.clone(), camQ: camera.quaternion.clone(), next: 0.9, idx: 0, shown: false };
   G.total = 0;
   setCine(true);
@@ -3575,7 +3730,7 @@ function updateCheckout(dt) {
   }
   if (co.shown) {
     const best = bests[bestKey()];
-    $('resS').innerHTML = `Level ${G.level} · Zeit <b>${fmt(G.time)}</b>${G.isRecord ? ' <span class="rec">NEUER REKORD!</span>' : ' · Bestzeit ' + fmt(best)}<br>${G.list.length} Produkte · Summe <b>${G.total.toFixed(2)} €</b>`;
+    $('resS').innerHTML = `Level ${G.level} · Zeit <b>${fmt(G.time)}</b>${G.isRecord ? ' <span class="rec">NEUER REKORD!</span>' : ' · Bestzeit ' + fmt(best)}<br>⭐ Stil-Punkte <b>${G.style.toLocaleString('de-DE')}</b>${G.styleRecord && G.style > 0 ? ' <span class="rec">STIL-REKORD!</span>' : ''}<br>${G.list.length} Produkte · Summe <b>${G.total.toFixed(2)} €</b>`;
   }
 }
 function nextLevel() {
@@ -3758,6 +3913,7 @@ function updatePlay(dt) {
       if (!G.nagT || G.clock - G.nagT > 3) { G.nagT = G.clock; toast('Erst alles von der Liste holen!'); SFX.nope(); }
     }
   }
+  STY.update(dt); EV.update(dt);
   updateHazards(dt, G.clock, C.x, C.z, sp, (tw) => { SFX.rumble(); toast('Achtung, das Regal kippt!', 1500); C.shake = 0.6; });
 }
 
@@ -3911,9 +4067,192 @@ $('pauseBtn').addEventListener('click', (e) => { e.stopPropagation(); SFX.init()
 document.addEventListener('visibilitychange', () => { if (document.hidden && (G.state === 'play' || G.state === 'countdown')) togglePause(); });
 
 // boot
-loadWorld("std");
-showMenu();
-requestAnimationFrame(frame);
+
+// ============================================================
+//  Shopping Drifters – style points, announcements, power cuts, moved products
+// ============================================================
+
+// ---------------------------------------------------------------- style points
+const STY = (() => {
+  let score = 0, combo = 0, comboT = 0, drift = 0, driftOff = 0, wall = 0, wallOff = 0, stopCand = null, lastLock = false;
+  const box = $('style'), num = $('styleNum'), mult = $('styleMult'), pops = $('stylePops'), live = $('styleLive');
+  const multOf = () => Math.min(5, 1 + Math.floor(combo / 2));
+  function render() {
+    num.textContent = score.toLocaleString('de-DE');
+    const m = multOf();
+    mult.textContent = 'x' + m; mult.classList.toggle('hidden', combo < 2);
+    mult.style.background = ['#4b5275', '#4b5275', '#2bb24a', '#2a7de1', '#b34fe0', '#e8322b'][m];
+  }
+  function popup(txt, cls = '') {
+    const d = document.createElement('div'); d.className = 'pop ' + cls; d.innerHTML = txt;
+    pops.prepend(d); while (pops.children.length > 4) pops.lastChild.remove();
+    setTimeout(() => d.remove(), 2600);
+  }
+  function add(name, pts) {
+    if (G.state !== 'play') return;
+    combo++; comboT = 3.5;
+    const m = multOf(), total = Math.round(pts * m);
+    score += total;
+    popup(`<b>+${total}</b> ${name}${m > 1 ? ` <i>x${m}</i>` : ''}`);
+    SFX.style(m);
+    box.classList.remove('bump'); void box.offsetWidth; box.classList.add('bump');
+    render();
+  }
+  function breakCombo() {
+    if (combo >= 2) popup('COMBO WEG!', 'bad');
+    combo = 0; comboT = 0; drift = 0; wall = 0; render();
+  }
+  function reset() { score = 0; combo = 0; comboT = 0; drift = 0; wall = 0; stopCand = null; pops.innerHTML = ''; live.textContent = ''; render(); }
+  // distance from the cart to the nearest obstacle box (for the "precision stop")
+  function wallDist() {
+    let best = 99;
+    for (const off of [0.27, -0.3]) {
+      const cx = C.x + Math.sin(C.h) * off, cz = C.z + Math.cos(C.h) * off;
+      for (const list of [COLS, DYN_BOXES]) for (const b of list) {
+        const dx = Math.max(b.x0 - cx, 0, cx - b.x1), dz = Math.max(b.z0 - cz, 0, cz - b.z1);
+        best = Math.min(best, Math.hypot(dx, dz) - PHY.R);
+      }
+    }
+    return best;
+  }
+  function update(dt) {
+    const v = Math.hypot(C.vx, C.vz), lock = input.drift;
+    if (comboT > 0) { comboT -= dt; if (comboT <= 0) { combo = 0; render(); } }
+    // drift: points while sliding, banked when the drift ends
+    if (!lock && C.slip > 0.3 && v > 5) { drift += dt * v * C.slip * 14; driftOff = 0; }
+    else if (drift > 0) { driftOff += dt; if (driftOff > 0.35) { if (drift >= 40) add('DRIFT', drift); drift = 0; } }
+    // wall ride
+    if (C.scrape > 0) { wall += dt * v * 10; wallOff = 0; }
+    else if (wall > 0) { wallOff += dt; if (wallOff > 0.3) { if (wall >= 25) add('WALL-RIDE', wall); wall = 0; } }
+    const liveTxt = drift > 20 ? `DRIFT ${Math.round(drift)}` : wall > 15 ? `WALL-RIDE ${Math.round(wall)}` : '';
+    if (live.textContent !== liveTxt) live.textContent = liveTxt;
+    // hockey stop: started sideways & fast, ends standing → precision bonus if close to a shelf
+    if (lock && !lastLock && v > 5 && C.slip > 0.5) stopCand = { v };
+    if (!lock) stopCand = null;
+    if (stopCand && v < 0.3) {
+      const d = wallDist();
+      if (d < 0.7) add('PRÄZISIONS-STOPP', 250 + Math.round((0.7 - d) * 300)); else add('HOCKEY-STOPP', 80);
+      stopCand = null;
+    }
+    lastLock = lock;
+    // near misses with people / machines
+    if (v > 5) for (const sh of HZ.shoppers) {
+      if (sh.bump > 0 || (sh.nmT || 0) > G.clock) continue;
+      for (const c of [sh.col, sh.col2]) {
+        if (!c) continue;
+        const d = Math.hypot(C.x - c.x, C.z - c.z) - c.r - PHY.R;
+        if (d > 0.03 && d < 0.6) { sh.nmT = G.clock + 3; add(sh.kind === 'oma' ? 'OMA VERSCHONT' : 'KNAPP!', sh.kind === 'oma' ? 150 : 80); break; }
+      }
+    }
+  }
+  return { add, breakCombo, reset, update, get score() { return score; } };
+})();
+const breakCombo = () => STY.breakCombo();
+
+// ---------------------------------------------------------------- announcements
+let annT = 0;
+function announce(txt, ms = 4200) {
+  const a = $('announce'); a.innerHTML = '📢 ' + txt; a.classList.add('show');
+  SFX.gong(); clearTimeout(annT); annT = setTimeout(() => a.classList.remove('show'), ms);
+}
+const FUN_ANN = [
+  'Der Fahrer des motorisierten Einkaufswagens wird gebeten, die Reifen zu schonen.',
+  'Heute im Angebot: Bremsen. Bitte bedienen Sie sich.',
+  'Kassierer bitte zu Kasse 2 – und Helm aufsetzen.',
+  'Wer hat den Wagen getunt? Bitte an der Info melden.',
+  'Liebe Kunden, bitte driften Sie nur in den markierten Bereichen.',
+  'Ein kleiner Junge sucht seine Mama. Und sein Skateboard.',
+];
+
+// ---------------------------------------------------------------- events: power cut + moved products
+const EV = (() => {
+  let t = 0, lights = null, moves = [], funT = 0;
+  const islands = [];
+  const spot = new T.SpotLight('#fff6d8', 0, 32, 0.55, 0.6, 1.2);
+  spot.position.set(0, 0.35, 0.5); cart.body.add(spot);
+  const spotTarget = new T.Object3D(); spotTarget.position.set(0, 0.2, 9); cart.body.add(spotTarget); spot.target = spotTarget;
+  function setDark(k) { // k = 0 normal … 1 dark
+    hemi.intensity = lerp(LIGHT_BASE.hemi, LIGHT_BASE.hemi * 0.1, k);
+    sun.intensity = lerp(LIGHT_BASE.sun, LIGHT_BASE.sun * 0.05, k);
+    if (STORE_ANIM.lampMat) STORE_ANIM.lampMat.color.copy(STORE_ANIM.lampCol).multiplyScalar(1 - 0.85 * k);
+    if (LIGHT_BASE.fog) scene.fog.color.copy(LIGHT_BASE.fog).multiplyScalar(1 - 0.8 * k);
+    spot.intensity = 220 * k;
+  }
+  function reset(cfg) {
+    t = 0; funT = R(8, 14);
+    lights = cfg.lightsOut ? { at: R(18, 40), phase: 0, pt: 0 } : null;
+    setDark(0);
+    restoreMoves();
+    moves = [];
+    for (let i = 0; i < cfg.wander; i++) moves.push({ at: 22 + i * R(18, 26), done: false });
+  }
+  function update(dt) {
+    t += dt;
+    if (funT > 0) { funT -= dt; if (funT <= 0 && !lights) announce(pick(FUN_ANN)); }
+    // ---- power cut ----
+    if (lights) {
+      const L = lights;
+      if (L.phase === 0 && t > L.at) { L.phase = 1; L.pt = 0; announce('Stromausfall! Bitte bleiben Sie ruhig. Ihr Wagen hat Scheinwerfer.', 5000); SFX.power(false); }
+      if (L.phase > 0) L.pt += dt;
+      if (L.phase === 1) { setDark(Math.random() < 0.5 ? 1 : 0.2); if (L.pt > 1.3) { L.phase = 2; L.pt = 0; setDark(1); } }
+      else if (L.phase === 2 && L.pt > 13) { L.phase = 3; L.pt = 0; SFX.power(true); }
+      else if (L.phase === 3) { setDark(Math.random() < 0.5 ? 0.9 : 0); if (L.pt > 0.9) { L.phase = 4; setDark(0); announce('Strom ist wieder da. Weiterdriften!'); } }
+    }
+    // ---- a product gets moved to a promo island ----
+    for (const mv of moves) {
+      if (mv.done || t < mv.at) continue;
+      mv.done = true;
+      const left = G.list.filter((p) => !G.got.has(p.id) && !p.moved);
+      if (left.length) moveProduct(pick(left));
+    }
+  }
+  // islands: in the cross aisle (z 29) or the back aisle (z 46.3) at an aisle center
+  function moveProduct(p) {
+    const cands = [];
+    for (let a = 0; a < 7; a++) for (const z of [29, 46.3]) cands.push({ a, x: AISLES[a].cx, z });
+    const ok = cands.filter((c) => Math.hypot(c.x - C.x, c.z - C.z) > 9 && !islands.some((i) => i.a === c.a && i.z === c.z));
+    if (!ok.length) return;
+    const c = pick(ok);
+    hideBlock(p.id, SPOTS[p.id]);
+    const o = new Obj();
+    o.box(1.0, 0.62, 0.7, 0, 0.31, 0, '#e8322b'); o.box(1.04, 0.04, 0.74, 0, 0.64, 0, '#ffffff'); o.box(1.04, 0.06, 0.74, 0, 0.04, 0, '#9a1a1a');
+    o.box(0.04, 0.9, 0.04, 0, 1.1, 0, '#c8ccd0'); o.box(0.6, 0.3, 0.03, 0, 1.6, 0, '#ffd84a');
+    const g = new T.Group(); g.add(new MeshAcc().addObj(o).build(VCMAT)); g.children[0].castShadow = true;
+    const n = Math.max(1, Math.min(4, Math.floor(0.9 / p.w)));
+    for (let row = 0; row < 2; row++) for (let i = 0; i < n; i++) {
+      const m = new T.Mesh(p.geo, VCMAT); m.position.set(-0.45 + (i + 0.5) * (0.9 / n), 0.66, row ? 0.17 : -0.17); m.rotation.y = row ? 0 : PI; g.add(m);
+    }
+    const sign = new T.Mesh(new T.PlaneGeometry(0.56, 0.26), new T.MeshBasicMaterial({ map: canvasTex(256, 120, (gc, w, h) => { gc.fillStyle = '#ffd84a'; gc.fillRect(0, 0, w, h); gc.textAlign = 'center'; gc.textBaseline = 'middle'; gc.font = `${h * 0.55}px ${EMOJI_FONT}`; gc.fillText(p.e, w * 0.2, h * 0.55); gc.fillStyle = '#e8322b'; fitText(gc, 'HIER!', w * 0.62, h * 0.55, w * 0.55, h * 0.5); }) }));
+    sign.position.set(0, 1.6, 0.02); const s2 = sign.clone(); s2.rotation.y = PI; s2.position.z = -0.02; g.add(sign, s2);
+    g.position.set(c.x, 0, c.z); HZ.group.add(g);
+    addCol(c.x - 0.52, c.z - 0.37, c.x + 0.52, c.z + 0.37, DYN_BOXES);
+    islands.push(c);
+    SPOTS[p.id] = { ax: c.x - 0.4, az: c.z, bx: c.x + 0.4, bz: c.z, nx: 0, nz: -1, mx: c.x, mz: c.z, y: 0.7 };
+    p.moved = true;
+    if (G.markers[p.id]) scene.remove(G.markers[p.id].g);
+    G.markers[p.id] = makeMarker(SPOTS[p.id]);
+    G.markers[p.id].arrow.position.set(c.x, 2.3, c.z);
+    const where = c.z < 40 ? `im mittleren Quergang bei Gang ${c.a + 1}` : `im hinteren Gang bei Gang ${c.a + 8}`;
+    announce(`${p.e} <b>${p.n}</b> wurde umgeräumt – jetzt auf einer Aktionsinsel ${where}!`, 6000);
+    const li = $('li_' + p.id); if (li) li.classList.add('moved');
+  }
+  function restoreMoves() {
+    for (const p of PRODUCTS) if (p.moved) { p.moved = false; SPOTS[p.id] = ORIG_SPOTS[p.id]; }
+    for (const l of PRODUCT_LOD) if (l.hidden) { l.hidden = false; for (const im of [l.hi, l.mid, l.lo]) { l.mats.forEach((m, i) => im.setMatrixAt(i, m)); im.instanceMatrix.needsUpdate = true; } }
+    islands.length = 0;
+  }
+  const ZERO = new T.Matrix4().makeScale(0, 0, 0);
+  function hideBlock(id, sp) {
+    for (const l of PRODUCT_LOD) {
+      if (l.id !== id) continue;
+      l.mats.forEach((m, i) => {
+        if (spotDist(sp, m.elements[12], m.elements[14]).d < 0.75) { l.hidden = true; for (const im of [l.hi, l.mid, l.lo]) im.setMatrixAt(i, ZERO); }
+      });
+      for (const im of [l.hi, l.mid, l.lo]) im.instanceMatrix.needsUpdate = true;
+    }
+  }
+  return { reset, update, setDark };
+})();
 
 // ============================================================
 //  Shopping Drifters – touch controls (iPad / phone)
@@ -3999,6 +4338,13 @@ const TOUCH = (() => {
 })();
 // key label for prompts: keyboard key, or the button name in touch mode
 function K(key, touchName) { return TOUCH.active() ? `<kbd class="tk">${touchName}</kbd>` : `<kbd>${key}</kbd>`; }
+
+// ============================================================
+//  Shopping Drifters – start-up (runs after every module is defined)
+// ============================================================
+loadWorld('std');
+showMenu();
+requestAnimationFrame(frame);
 
 </script>
 </body>

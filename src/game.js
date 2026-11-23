@@ -284,6 +284,7 @@ function collide(dt) {
   }
   if (impact > 1.6 && C.crashCd <= 0) {
     C.crashCd = 0.25;
+    if (impact > 3) breakCombo();
     SFX.crash(impact / 7);
     C.shake = Math.min(1, C.shake + impact / 8);
     C.yawRate += (Math.random() - 0.5) * impact * 0.25;
@@ -315,6 +316,7 @@ function updateSparks(dt) {
 function fireNitro() {
   if (G.state !== 'play' || C.nitro <= 0) return;
   C.boostT = C.nitro; C.nitro = 0; C.nitroT = 0;
+  if (C.slip > 0.3) STY.add('NITRO-DRIFT', 120); else STY.add('NITRO', 30);
   SFX.boost(); flash($('turbo'), 900); spawnPuffs(5, '#9ff6ff'); C.shake = Math.min(1, C.shake + 0.3);
 }
 function nitroPuff() { // pressure escapes from the valve
@@ -322,7 +324,17 @@ function nitroPuff() { // pressure escapes from the valve
   for (let i = 0; i < 6; i++) spawnPuff(p.x, p.y, p.z, R(-0.6, 0.6), R(0.6, 1.4), R(-0.6, 0.6), 0.7, 0.04, '#e6f7ff');
 }
 function bumpShopper(c) {
-  for (const sh of HZ.shoppers) if (sh.col === c && sh.bump <= 0) { sh.bump = 1.2; SFX.hey(); toast(pick(['Hey! Pass doch auf!', 'Rowdy!', 'Unverschämtheit!', 'Mein Joghurt!!'])); }
+  for (const sh of HZ.shoppers) {
+    if ((sh.col !== c && sh.col2 !== c) || sh.bump > 0) continue;
+    sh.bump = sh.kind === 'oma' ? 2.5 : 1.2;
+    if (sh.kind === 'oma') {
+      G.time += 5; SFX.nope(); SFX.hey(); C.shake = Math.min(1, C.shake + 0.5); breakCombo();
+      toast('👵 Oma angefahren! +5 Sek. Strafe', 2200);
+    } else {
+      SFX.hey();
+      toast(pick({ kid: ['Mamaaa!', 'Hihi, nochmal!', 'Aua!'], jack: ['Vorsicht, Palette!', 'Hey, ich arbeite hier!'], cleaner: ['Ich hab hier grad gewischt!', 'Pass auf, nass!'] }[sh.kind] || ['Hey! Pass doch auf!', 'Rowdy!', 'Unverschämtheit!', 'Mein Joghurt!!']));
+    }
+  }
 }
 
 // ---------- effects: puffs + skid marks ----------
@@ -434,6 +446,7 @@ function setupLevel(level) {
   resetCart(START.x, START.z, START.h);
   cart.drawDial(G.cfg.minKmh);
   for (const l of LANES) { l.lamp.color.set('#ff6a6a'); drawScreen(l, '', ''); }
+  STY.reset(); EV.reset(G.cfg);
   renderList();
   $('lvl').textContent = 'LEVEL ' + level;
 }
@@ -580,6 +593,7 @@ function pickup(id, rolling = false) {
     toast('Alles da! Ab zur Kasse! 🛒', 2500); SFX.ding();
     for (const l of LANES) l.lamp.color.set('#5dff7a');
   } else toast(p.e + ' ' + p.n + (rolling ? ' im Vorbeifahren geschnappt! 😎' : ' eingeladen!'), 1200);
+  if (rolling) STY.add('IM VORBEIFAHREN', 150 + Math.round(Math.hypot(C.vx, C.vz) * 3.6 * 8));
 }
 function updateItems(dt) {
   const tmp = new V3();
@@ -605,7 +619,10 @@ function startCheckout(lane) {
   G.lane = lane;
   const best = bests[bestKey()];
   G.isRecord = !best || G.time < best;
-  if (G.isRecord) { bests[bestKey()] = G.time; saveJ('sd_bests', bests); }
+  if (G.isRecord) { bests[bestKey()] = G.time; }
+  G.style = STY.score; G.styleRecord = G.style > (bests[bestKey() + '_s'] || 0);
+  if (G.styleRecord) bests[bestKey() + '_s'] = G.style;
+  saveJ('sd_bests', bests);
   G.co = { t: 0, from: { x: C.x, z: C.z, h: C.h }, h: Math.cos(C.h) < 0 ? PI : 0, camFrom: camera.position.clone(), camQ: camera.quaternion.clone(), next: 0.9, idx: 0, shown: false };
   G.total = 0;
   setCine(true);
@@ -646,7 +663,7 @@ function updateCheckout(dt) {
   }
   if (co.shown) {
     const best = bests[bestKey()];
-    $('resS').innerHTML = `Level ${G.level} · Zeit <b>${fmt(G.time)}</b>${G.isRecord ? ' <span class="rec">NEUER REKORD!</span>' : ' · Bestzeit ' + fmt(best)}<br>${G.list.length} Produkte · Summe <b>${G.total.toFixed(2)} €</b>`;
+    $('resS').innerHTML = `Level ${G.level} · Zeit <b>${fmt(G.time)}</b>${G.isRecord ? ' <span class="rec">NEUER REKORD!</span>' : ' · Bestzeit ' + fmt(best)}<br>⭐ Stil-Punkte <b>${G.style.toLocaleString('de-DE')}</b>${G.styleRecord && G.style > 0 ? ' <span class="rec">STIL-REKORD!</span>' : ''}<br>${G.list.length} Produkte · Summe <b>${G.total.toFixed(2)} €</b>`;
   }
 }
 function nextLevel() {
@@ -829,6 +846,7 @@ function updatePlay(dt) {
       if (!G.nagT || G.clock - G.nagT > 3) { G.nagT = G.clock; toast('Erst alles von der Liste holen!'); SFX.nope(); }
     }
   }
+  STY.update(dt); EV.update(dt);
   updateHazards(dt, G.clock, C.x, C.z, sp, (tw) => { SFX.rumble(); toast('Achtung, das Regal kippt!', 1500); C.shake = 0.6; });
 }
 
@@ -982,6 +1000,3 @@ $('pauseBtn').addEventListener('click', (e) => { e.stopPropagation(); SFX.init()
 document.addEventListener('visibilitychange', () => { if (document.hidden && (G.state === 'play' || G.state === 'countdown')) togglePause(); });
 
 // boot
-loadWorld("std");
-showMenu();
-requestAnimationFrame(frame);

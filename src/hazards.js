@@ -110,12 +110,19 @@ function levelCfg(n) {
     puddles: n >= 2 ? Math.min(3 + (n - 2) * 2, 12) : 0,
     shoppers: n >= 3 ? Math.min(3 + (n - 3) * 2, 14) : 0,
     towers: n >= 4 ? Math.min(2 + (n - 4), 7) : 0,
+    jacks: n >= 5 ? Math.min(1 + Math.floor((n - 5) / 2), 3) : 0,      // workers with pallet jacks
+    pallets: n >= 5 ? Math.min(2 + (n - 5), 6) : 0,                     // pallets parked in the aisles
+    cleaners: n >= 6 ? Math.min(1 + Math.floor((n - 6) / 3), 2) : 0,   // scrubber machine leaving a wet trail
+    kids: n >= 7 ? Math.min(2 + (n - 7), 5) : 0,
+    omas: n >= 7 ? (n >= 10 ? 2 : 1) : 0,                               // hitting her = time penalty
+    wander: n >= 8 ? Math.min(1 + Math.floor((n - 8) / 2), 3) : 0,     // products get moved
+    lightsOut: n >= 9,
   };
 }
 function clearHazards(scene) {
   if (HZ.group) scene.remove(HZ.group);
   HZ.group = new T.Group(); scene.add(HZ.group);
-  HZ.puddles = []; HZ.shoppers = []; HZ.towers = [];
+  HZ.puddles = []; HZ.shoppers = []; HZ.towers = []; HZ.trail = [];
   DYN_BOXES.length = 0; DYN_CIRCLES.length = 0;
 }
 let WET_UV = null;
@@ -168,9 +175,78 @@ function setupHazards(scene, level) {
     let path;
     if (rng() < 0.75) { const s = aisleSpot(); const x = s.A.cx + R(-1.4, 1.4); path = { ax: x, az: s.za + 0.8, bx: x, bz: s.zb - 0.8 }; }
     else { const z = rng() < 0.5 ? 29 : 46.3; path = { ax: R(-27, -5), az: z, bx: R(5, 27), bz: z }; }
-    const sh = { p, path, t: rng(), dir: rng() < 0.5 ? 1 : -1, speed: R(0.9, 1.4), turn: 0, bump: 0, col: { x: 0, z: 0, r: 0.7 } };
+    const sh = { kind: 'shopper', p, path, t: rng(), dir: rng() < 0.5 ? 1 : -1, speed: R(0.9, 1.4), turn: 0, bump: 0, col: { x: 0, z: 0, r: 0.7 } };
     sh.len = Math.hypot(path.bx - path.ax, path.bz - path.az);
     HZ.group.add(p.g); HZ.shoppers.push(sh); DYN_CIRCLES.push(sh.col);
+  }
+  const pathFor = (aislesOnly) => {
+    if (aislesOnly || rng() < 0.7) { const s = aisleSpot(); const x = s.A.cx + R(-1.2, 1.2); return { ax: x, az: s.za + 0.8, bx: x, bz: s.zb - 0.8 }; }
+    const z = rng() < 0.5 ? 29 : 46.3; return { ax: R(-27, -5), az: z, bx: R(5, 27), bz: z };
+  };
+  const addMover = (kind, p, path, speed, r, extra = {}) => {
+    const sh = Object.assign({ kind, p, path, t: rng(), dir: rng() < 0.5 ? 1 : -1, speed, turn: 0, bump: 0, col: { x: 0, z: 0, r } }, extra);
+    sh.len = Math.hypot(path.bx - path.ax, path.bz - path.az);
+    HZ.group.add(p.g); HZ.shoppers.push(sh); DYN_CIRCLES.push(sh.col); if (sh.col2) DYN_CIRCLES.push(sh.col2);
+    return sh;
+  };
+  // ---- workers pulling pallet jacks ----
+  const palletLoad = (o, x, z, ry = 0) => {
+    const t = new Obj();
+    t.box(1.2, 0.14, 0.8, 0, 0.07, 0, '#b88a50');
+    for (const zz of [-0.32, 0, 0.32]) t.box(1.2, 0.03, 0.12, 0, 0.155, zz, '#c8a06a');
+    for (let k = 0; k < 4; k++) t.box(0.55, 0.38, 0.38, (k % 2 ? 0.28 : -0.28), 0.36 + Math.floor(k / 2) * 0.4, 0, ['#c8914a', '#b97b3a', '#d9a253', '#c8914a'][k]);
+    for (const x of [-0.3, 0.3]) t.box(0.04, 0.84, 0.8, x, 0.58, 0, '#f4f4f4'); // straps
+    t.box(1.14, 0.03, 0.78, 0, 0.98, 0, '#f4f4f4');
+    o.put(t, x, 0, z, ry);
+  };
+  for (let i = 0; i < cfg.jacks; i++) {
+    const p = buildPerson('#ff8a1f', '#2b3550', pick(HAIR), pick(SKINS), { style: 'cap', capColor: '#1d2230', jacket: null, logo: '#f2ff3a' });
+    const jo = new Obj();
+    jo.box(0.12, 0.06, 1.2, -0.25, 0.04, -1.1, '#d6262b'); jo.box(0.12, 0.06, 1.2, 0.25, 0.04, -1.1, '#d6262b');
+    jo.box(0.6, 0.25, 0.2, 0, 0.15, -0.45, '#d6262b'); jo.cyl(0.02, 1.0, 0, 0.6, -0.25, '#1d2230', { rx: 0.6, seg: 6 });
+    palletLoad(jo, 0, -1.15, PI / 2);
+    const m = new MeshAcc().addObj(jo).build(VCMAT); m.castShadow = true; p.g.add(m);
+    p.arms[1].rotation.x = 0.5; p.arms[0].rotation.x = 0.3;
+    addMover('jack', p, pathFor(false), R(1.3, 1.7), 0.4, { col2: { x: 0, z: 0, r: 0.75 }, back: 1.15 });
+  }
+  // ---- parked pallets half blocking an aisle ----
+  for (let i = 0; i < cfg.pallets; i++) {
+    const s = aisleSpot(), side = rng() < 0.5 ? -1 : 1;
+    const x = side < 0 ? s.A.x0 + 0.65 : s.A.x1 - 0.65, z = R(s.za + 2, s.zb - 2);
+    const po = new Obj(); palletLoad(po, 0, 0, PI / 2);
+    const m = new MeshAcc().addObj(po).build(VCMAT); m.position.set(x, 0, z); m.castShadow = true; HZ.group.add(m);
+    addCol(x - 0.42, z - 0.62, x + 0.42, z + 0.62, DYN_BOXES);
+  }
+  // ---- floor scrubber leaving a wet trail ----
+  for (let i = 0; i < cfg.cleaners; i++) {
+    const g = new T.Group(), co = new Obj();
+    co.box(0.9, 0.55, 1.3, 0, 0.38, 0, '#2a62c9'); co.box(0.92, 0.08, 1.32, 0, 0.66, 0, '#ffd21f');
+    co.box(1.0, 0.1, 0.5, 0, 0.08, 0.55, '#1d2230'); co.box(0.5, 0.35, 0.4, 0, 0.85, -0.35, '#1d2230');
+    co.box(0.45, 0.08, 0.4, 0, 0.72, -0.15, '#3a3f4a'); co.cyl(0.05, 0.4, 0, 0.9, 0.35, '#1d2230', { rx: -0.5, seg: 6 }); co.torus(0.13, 0.15, 0, 1.08, 0.45, '#1d2230', { rx: -1.1, seg: 10 });
+    for (const sx of [-0.4, 0.4]) co.cyl(0.13, 0.08, sx, 0.13, -0.45, '#222', { rz: PI / 2, seg: 10 });
+    co.cyl(0.06, 0.1, 0.3, 1.0, -0.5, '#ff8a1f', { seg: 8 }); // warning light
+    const cm = new MeshAcc().addObj(co).build(VCMAT); cm.castShadow = true; g.add(cm);
+    const driver = buildPerson('#1aa39a', '#2b3550', pick(HAIR), pick(SKINS), { style: 'cap', capColor: '#1aa39a' });
+    driver.g.position.set(0, -0.15, -0.15); driver.legs.forEach((l) => (l.rotation.x = -1.3)); driver.arms.forEach((a) => (a.rotation.x = -1.0)); g.add(driver.g);
+    const brush = new T.Mesh(new T.CylinderGeometry(0.45, 0.45, 0.05, 12), new T.MeshLambertMaterial({ color: '#3a3f4a' })); brush.position.set(0, 0.04, 0.3); g.add(brush);
+    addMover('cleaner', { g, legs: [], arms: [] }, pathFor(false), R(1.0, 1.3), 0.85, { brush, lastDrop: null });
+  }
+  // ---- kids running around ----
+  for (let i = 0; i < cfg.kids; i++) {
+    const p = buildPerson(pick(['#ff4fa8', '#4ff2ff', '#ffd21f', '#2bd45a', '#ff8a1f']), pick(PANTS), pick(HAIR), pick(SKINS), { jacket: null });
+    p.g.scale.setScalar(0.62);
+    const sh = addMover('kid', p, { ax: 0, az: 0, bx: 0, bz: 1 }, R(2.4, 3.2), 0.35, { tx: 0, tz: 0, x: 0, z: 0 });
+    const s0 = aisleSpot(); sh.x = s0.A.cx; sh.z = R(s0.za, s0.zb); sh.tx = sh.x; sh.tz = sh.z;
+  }
+  // ---- grandma with walker (don't hit her!) ----
+  for (let i = 0; i < cfg.omas; i++) {
+    const p = buildPerson('#8a6bd6', '#555b66', '#d9d9d9', '#f0c29a', { style: 'bun', glasses: true, jacket: null, logo: null, shoe: '#6b4226' });
+    const wo = new Obj();
+    for (const sx of [-0.22, 0.22]) { wo.box(0.03, 0.85, 0.03, sx, 0.43, 0.55, '#c8ccd0'); wo.box(0.03, 0.85, 0.03, sx, 0.43, 0.25, '#c8ccd0'); wo.cyl(0.05, 0.03, sx, 0.05, 0.55, '#222', { rz: PI / 2, seg: 8 }); wo.cyl(0.035, 0.12, sx, 0.85, 0.4, '#1d2230', { rx: PI / 2, seg: 6 }); }
+    wo.box(0.47, 0.03, 0.03, 0, 0.85, 0.55, '#c8ccd0'); wo.box(0.4, 0.2, 0.25, 0, 0.55, 0.4, '#d6262b'); // basket
+    const m = new MeshAcc().addObj(wo).build(VCMAT); m.castShadow = true; p.g.add(m);
+    p.arms[0].rotation.x = p.arms[1].rotation.x = -0.9;
+    addMover('oma', p, pathFor(true), R(0.45, 0.6), 0.6);
   }
   // ---- wobbly display towers that topple when you come close ----
   for (let i = 0; i < cfg.towers; i++) {
@@ -195,23 +271,63 @@ function setupHazards(scene, level) {
 }
 function puddleAt(x, z) {
   for (const p of HZ.puddles) { const dx = (x - p.x) / p.rx, dz = (z - p.z) / p.rz; if (dx * dx + dz * dz < 1) return true; }
+  for (const p of HZ.trail) if (p.life > 1.5 && (x - p.x) ** 2 + (z - p.z) ** 2 < p.r * p.r) return true;
   return false;
+}
+const trailGeo = new T.CircleGeometry(1, 12);
+function dropTrail(x, z) {
+  const mat = puddleMat.clone(); mat.opacity = 0.5;
+  const m = new T.Mesh(trailGeo, mat); m.rotation.x = -PI / 2; m.position.set(x, 0.011, z); m.scale.set(0.8, 0.8, 1);
+  HZ.group.add(m); HZ.trail.push({ x, z, r: 0.75, life: 14, m });
 }
 function updateHazards(dt, time, cx, cz, speed, onFall) {
   for (const sh of HZ.shoppers) {
     if (sh.bump > 0) sh.bump -= dt;
-    if (sh.turn > 0) { sh.turn -= dt; if (sh.turn <= 0) sh.dir *= -1; }
-    else if (sh.bump <= 0) {
-      sh.t += (sh.dir * sh.speed * dt) / sh.len;
-      if (sh.t > 1 || sh.t < 0) { sh.t = clamp(sh.t, 0, 1); sh.turn = 0.8; }
+    let x, z, yaw;
+    if (sh.kind === 'kid') { // run from one random spot to the next
+      if (sh.bump <= 0) {
+        if (!sh.way || !sh.way.length) { // new target: always walk via the cross aisles (never through shelves)
+          const a = AISLES[RI(0, 6)], tx = a.cx + R(-1.4, 1.4), tz = rng() < 0.5 ? pick([12, 29, 46.3]) : R(HALVES[RI(0, 1)][0] + 1, HALVES[1][1] - 1);
+          const cross = [12, 29, 46.3].reduce((b, c) => (Math.abs(c - sh.z) < Math.abs(b - sh.z) ? c : b), 12);
+          const tcross = [12, 29, 46.3].reduce((b, c) => (Math.abs(c - tz) < Math.abs(b - tz) ? c : b), 12);
+          sh.way = Math.abs(tx - sh.x) > 2.5 ? [[sh.x, cross], [tx, cross], [tx, tcross], [tx, tz]] : [[tx, tz]];
+        }
+        const [wx, wz] = sh.way[0], dx = wx - sh.x, dz = wz - sh.z, d = Math.hypot(dx, dz);
+        if (d < 0.3) sh.way.shift();
+        else { const st = Math.min(d, sh.speed * dt); sh.x += (dx / d) * st; sh.z += (dz / d) * st; sh.yaw = Math.atan2(dx, dz); }
+      }
+      x = sh.x; z = sh.z; yaw = sh.yaw || 0;
+    } else {
+      if (sh.turn > 0) { sh.turn -= dt; if (sh.turn <= 0) sh.dir *= -1; }
+      else if (sh.bump <= 0) {
+        sh.t += (sh.dir * sh.speed * dt) / sh.len;
+        if (sh.t > 1 || sh.t < 0) { sh.t = clamp(sh.t, 0, 1); sh.turn = sh.kind === 'oma' ? 2.0 : 0.8; }
+      }
+      const { path } = sh; x = lerp(path.ax, path.bx, sh.t); z = lerp(path.az, path.bz, sh.t);
+      yaw = Math.atan2((path.bx - path.ax) * sh.dir, (path.bz - path.az) * sh.dir);
+      const tt = sh.kind === 'oma' ? 2.0 : 0.8;
+      if (sh.turn > 0) yaw += PI * (1 - sh.turn / tt);
     }
-    const { path } = sh, x = lerp(path.ax, path.bx, sh.t), z = lerp(path.az, path.bz, sh.t);
-    let yaw = Math.atan2((path.bx - path.ax) * sh.dir, (path.bz - path.az) * sh.dir);
-    if (sh.turn > 0) yaw += PI * (1 - sh.turn / 0.8);
     sh.p.g.position.set(x, 0, z); sh.p.g.rotation.y = yaw;
-    const walk = sh.turn > 0 || sh.bump > 0 ? 0 : Math.sin(time * 6 * sh.speed) * 0.5;
-    sh.p.legs[0].rotation.x = walk; sh.p.legs[1].rotation.x = -walk;
-    sh.col.x = x + Math.sin(yaw) * 0.45; sh.col.z = z + Math.cos(yaw) * 0.45;
+    const moving = !(sh.turn > 0 || sh.bump > 0);
+    const freq = sh.kind === 'kid' ? 16 : sh.kind === 'oma' ? 4 : 6 * sh.speed;
+    const walk = moving ? Math.sin(time * freq) * (sh.kind === 'kid' ? 0.9 : sh.kind === 'oma' ? 0.25 : 0.5) : 0;
+    if (sh.p.legs.length) { sh.p.legs[0].rotation.x = walk; sh.p.legs[1].rotation.x = -walk; }
+    if (sh.kind === 'kid') { sh.p.arms[0].rotation.x = -walk; sh.p.arms[1].rotation.x = walk; }
+    const fx = Math.sin(yaw), fz = Math.cos(yaw);
+    if (sh.kind === 'jack') { sh.col.x = x; sh.col.z = z; sh.col2.x = x - fx * sh.back; sh.col2.z = z - fz * sh.back; }
+    else if (sh.kind === 'shopper' || sh.kind === 'oma') { sh.col.x = x + fx * 0.45; sh.col.z = z + fz * 0.45; }
+    else { sh.col.x = x; sh.col.z = z; }
+    if (sh.kind === 'cleaner') {
+      sh.brush.rotation.y += dt * 12;
+      if (moving && (!sh.lastDrop || Math.hypot(x - sh.lastDrop[0], z - sh.lastDrop[1]) > 0.7)) { sh.lastDrop = [x, z]; dropTrail(x - fx * 0.5, z - fz * 0.5); }
+    }
+  }
+  // wet trail dries up
+  for (let i = HZ.trail.length - 1; i >= 0; i--) {
+    const p = HZ.trail[i]; p.life -= dt;
+    p.m.material.opacity = 0.5 * clamp(p.life / 3, 0, 1);
+    if (p.life <= 0) { HZ.group.remove(p.m); p.m.material.dispose(); HZ.trail.splice(i, 1); }
   }
   for (const tw of HZ.towers) {
     if (tw.state === 0) {

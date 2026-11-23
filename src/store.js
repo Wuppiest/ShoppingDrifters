@@ -20,6 +20,7 @@ let SECTIONS = WORLDS.std.sections;
 let CUR_WORLD = WORLDS.std;
 let WORLD_IDS = [];
 const SPOTS = {};       // productId → pickup spot
+let ORIG_SPOTS = {};    // copy of the spots right after building (products can get moved during a level)
 const LANES = [];       // checkout lanes
 const STORE_ANIM = {};
 const PRODUCT_LOD = []; // product chunks with 3 levels of detail
@@ -487,7 +488,7 @@ function buildStore(scene, W) {
         im.visible = false;
         scene.add(im); return im;
       };
-      PRODUCT_LOD.push({ hi: mk(p.geo), mid: mk(p.geoMid), lo: mk(p.geoLo), x: c.x / c.list.length, z: c.z / c.list.length });
+      PRODUCT_LOD.push({ hi: mk(p.geo), mid: mk(p.geoMid), lo: mk(p.geoLo), x: c.x / c.list.length, z: c.z / c.list.length, id: p.id, mats: c.list });
     }
   }
 
@@ -496,6 +497,7 @@ function buildStore(scene, W) {
   const walls = flat.build(VCMAT); walls.receiveShadow = true; scene.add(walls);
 
   buildSigns(scene, coolers, W);
+  ORIG_SPOTS = Object.assign({}, SPOTS);
 }
 
 let PRICE_UV = [];
