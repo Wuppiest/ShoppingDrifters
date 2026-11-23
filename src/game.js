@@ -18,7 +18,7 @@ renderer.shadowMap.type = T.PCFSoftShadowMap;
 const scene = new T.Scene();
 scene.background = new T.Color('#a9d8ff');
 scene.fog = new T.Fog('#e9e4d8', 28, 75);
-const camera = new T.PerspectiveCamera(settings.fov, 1, 0.03, 400);
+const camera = new T.PerspectiveCamera(settings.fov, 1, 0.05, 300);
 scene.add(new T.HemisphereLight('#ffffff', '#b3a58e', 1.55));
 const sun = new T.DirectionalLight('#fff4e2', 1.5);
 sun.castShadow = true;

@@ -79,7 +79,7 @@ function buildStore(scene) {
 
   // exterior shell, roof, sign
   const ex = new Obj();
-  ex.box(61.2, 0.5, 51.2, 0, STORE.H + 0.25, 25, '#9aa0a8');
+  ex.box(61.2, 0.5, 51.2, 0, STORE.H + 0.35, 25, '#9aa0a8'); // roof (kept above the ceiling plane → no z-fighting)
   for (const sx of [-1, 1]) {
     ex.box(27.7, 6.6, 0.3, sx * 16.85, 3.3, -0.55, '#e9e2d0');
     ex.box(2, 6.65, 0.4, sx * 4, 3.3, -0.6, '#1aa39a');
