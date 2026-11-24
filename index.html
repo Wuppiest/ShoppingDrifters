@@ -1484,7 +1484,8 @@ const S = (n, e, col, t) => ({ n, e, col, t });
 const WORLDS = {
   // ---------------------------------------------------------------- Drift-Markt
   std: {
-    id: 'std', name: 'Drift-Markt', logo: 'DRIFT-MARKT', short: ['DRIFT', 'MARKT'],
+    id: 'std', name: 'Drift-Markt',
+    layout: { W: 30, D: 50, gond: [-20, -12, -4, 4, 12, 20], halves: [[14, 27], [31, 44]], check: -1 }, logo: 'DRIFT-MARKT', short: ['DRIFT', 'MARKT'],
     H: 5.6, wall: '#f1ece0', band: '#1aa39a', kick: '#8a8f99', ceil: '#cfccc4', facade: '#e9e2d0',
     floor: { a: '#ece8df', b: '#e2ddd2', grout: '#cfc9bd', tile: 2 },
     fog: ['#e9e4d8', 28, 75], light: { hemi: ['#ffffff', '#b3a58e', 1.55], sun: ['#fff4e2', 1.5], bg: '#a9d8ff' },
@@ -1510,7 +1511,9 @@ const WORLDS = {
   },
   // ---------------------------------------------------------------- Baumarkt
   bau: {
-    id: 'bau', name: 'Baumarkt', logo: 'BAU-DRIFT', short: ['BAU', 'DRIFT'],
+    id: 'bau', name: 'Baumarkt',
+    // huge hall, very wide aisles, three blocks of racks, checkouts on the right
+    layout: { W: 38, D: 64, gond: [-27, -16, -5.5, 5.5, 16, 27], halves: [[15, 28], [33, 45], [50, 57]], check: 1 }, logo: 'BAU-DRIFT', short: ['BAU', 'DRIFT'],
     H: 6.8, wall: '#e6e2d6', band: '#ff7a00', kick: '#555b66', ceil: '#8a8f99', facade: '#d9d4c4',
     floor: { a: '#b9b6ae', b: '#b3b0a8', grout: '#8f8c85', tile: 4 },
     fog: ['#d8d4c8', 30, 80], light: { hemi: ['#ffffff', '#9a9488', 1.5], sun: ['#ffffff', 1.4], bg: '#a9d8ff' },
@@ -1535,7 +1538,9 @@ const WORLDS = {
   },
   // ---------------------------------------------------------------- Mega-Mall
   mall: {
-    id: 'mall', name: 'Mega-Mall', logo: 'DRIFT-MALL', short: ['DRIFT', 'MALL'],
+    id: 'mall', name: 'Mega-Mall',
+    // wide boulevard in the middle with the fountain, shops on both sides
+    layout: { W: 40, D: 58, gond: [-33, -25, -17, 17, 25, 33], halves: [[14, 24], [29, 39], [44, 51]], check: -1, boulevard: true }, logo: 'DRIFT-MALL', short: ['DRIFT', 'MALL'],
     H: 9, wall: '#f6f1ea', band: '#b34fe0', kick: '#3a3f4a', ceil: '#f4f1ea', facade: '#ece6dc', skylight: true,
     floor: { a: '#f4f1ec', b: '#d9d2c8', grout: '#c9a96a', tile: 3 },
     fog: ['#f1ece4', 35, 90], light: { hemi: ['#fffaf0', '#c8b8a0', 1.7], sun: ['#fff8ec', 1.6], bg: '#9fd4ff' },
@@ -1557,12 +1562,13 @@ const WORLDS = {
     front: { style: 'food', n: 'Food-Court', e: '🍔', sub: 'SNACKS', col: '#e8322b', items: [[10, 'burger', 'pizzastueck'], [17, 'donut', 'smoothie'], [24, 'slush', 'popcorn_m']] },
     candy: ['schoko', 'gummi', 'lolli', 'kopfhoerer', 'ladekabel'],
     posters: [['SALE', '-70%', '#e8322b'], ['NEU', 'Phone 9', '#1d2230'], ['KINO', 'Drift Movie', '#8a6bd6'], ['FOOD', 'Burger!', '#ff8a1f']],
-    fountain: true,
     desc: 'Riesig, glänzend, mit Brunnen und Food-Court.', icon: '🛍️', grad: ['#b34fe0', '#ff7eb6'],
   },
   // ---------------------------------------------------------------- Tiefkühl-Lager
   frost: {
-    id: 'frost', name: 'Tiefkühl-Lager', logo: 'FROST-LAGER', short: ['FROST', 'LAGER'],
+    id: 'frost', name: 'Tiefkühl-Lager',
+    // narrow and deep: many tight freezer aisles, long runs, checkouts on the right
+    layout: { W: 25, D: 66, gond: [-19.5, -14, -8.5, -3, 3, 8.5, 14, 19.5], halves: [[14, 37], [42, 60]], check: 1 }, logo: 'FROST-LAGER', short: ['FROST', 'LAGER'],
     H: 6, wall: '#e6f2fb', band: '#4fb0ff', kick: '#3a5a7a', ceil: '#a9c2d4', facade: '#dfeaf2',
     floor: { a: '#d6ecf6', b: '#c4e0ee', grout: '#a9c8da', tile: 2 },
     fog: ['#d6ebf7', 18, 60], light: { hemi: ['#eaf6ff', '#8fb0c8', 1.6], sun: ['#e6f4ff', 1.3], bg: '#cfe8ff' },
@@ -1602,24 +1608,30 @@ function worldProductIds(W) {
 // ============================================================
 const STORE = { W0: -30, W1: 30, D0: 0, D1: 50, H: 5.6 };
 const START = { x: 0, z: 3.2, h: 0 };
-const GONDOLA_X = [-20, -12, -4, 4, 12, 20];
-const HALVES = [[14, 27], [31, 44]];
 const SHELF_LEVELS = [0.13, 0.58, 1.03, 1.48];
-const COOLER_Z = 48.8;
-
-// aisle boundaries (front faces of the shelves left/right of each aisle)
-const AISLES = [];
-{
-  const xs = [-29.4, ...GONDOLA_X.flatMap((g) => [g - 0.8, g + 0.8]), 29.4];
-  for (let i = 0; i < 7; i++) AISLES.push({ x0: xs[i * 2], x1: xs[i * 2 + 1], cx: (xs[i * 2] + xs[i * 2 + 1]) / 2 });
+// floor plan (set per world by applyLayout)
+let GONDOLA_X = [], HALVES = [], COOLER_Z = 48.8, CROSS = [], CHECK = -1;
+const AISLES = []; // aisle boundaries (front faces of the shelves left/right of each aisle)
+function applyLayout(L) {
+  STORE.W0 = -L.W; STORE.W1 = L.W; STORE.D1 = L.D;
+  GONDOLA_X = L.gond; HALVES = L.halves; COOLER_Z = L.D - 1.2; CHECK = L.check;
+  AISLES.length = 0;
+  const xs = [-L.W + 0.6, ...GONDOLA_X.flatMap((g) => [g - 0.8, g + 0.8]), L.W - 0.6];
+  for (let i = 0; i < xs.length / 2; i++) AISLES.push({ x0: xs[i * 2], x1: xs[i * 2 + 1], cx: (xs[i * 2] + xs[i * 2 + 1]) / 2 });
+  // walkable cross aisles (z): front passage, gaps between the shelf blocks, back aisle
+  CROSS = [(10 + HALVES[0][0]) / 2];
+  for (let i = 0; i + 1 < HALVES.length; i++) CROSS.push((HALVES[i][1] + HALVES[i + 1][0]) / 2);
+  CROSS.push((HALVES[HALVES.length - 1][1] + COOLER_Z) / 2);
 }
+applyLayout(WORLDS.std.layout);
 
 // [aisle][half] → category (set per world)
 let SECTIONS = WORLDS.std.sections;
 let CUR_WORLD = WORLDS.std;
 let WORLD_IDS = [];
 const SPOTS = {};       // productId → pickup spot
-let ORIG_SPOTS = {};    // copy of the spots right after building (products can get moved during a level)
+let ORIG_SPOTS = {};
+let FRONT_X = 17;    // copy of the spots right after building (products can get moved during a level)
 const LANES = [];       // checkout lanes
 const STORE_ANIM = {};
 const PRODUCT_LOD = []; // product chunks with 3 levels of detail
@@ -1630,8 +1642,16 @@ function buildStore(scene, W) {
   COLS.length = 0; LANES.length = 0; PRODUCT_LOD.length = 0;
   for (const k in SPOTS) delete SPOTS[k];
   for (const p of PRODUCTS) p.section = null;
-  CUR_WORLD = W; SECTIONS = W.sections; STORE.H = W.H;
+  CUR_WORLD = W; STORE.H = W.H;
+  applyLayout(W.layout);
   WORLD_IDS = worldProductIds(W);
+  const Wd = STORE.W1, D = STORE.D1, nA = AISLES.length, nH = HALVES.length;
+  // categories → aisle sections; spare aisles become promo "Aktionsware"
+  const flatSec = W.sections.flat();
+  flatSec.forEach((sc) => delete sc.hdr);
+  const fillPool = WORLD_IDS.map((id) => PROD[id]).filter((p) => p.shape !== 'crateOf');
+  SECTIONS = []; let k = 0;
+  for (let a = 0; a < nA; a++) { SECTIONS[a] = []; for (let h = 0; h < nH; h++) SECTIONS[a][h] = k < flatSec.length ? flatSec[k++] : (k++, { n: 'Aktionsware', e: '🏷️', col: '#e8322b', t: [pick(fillPool).id, pick(fillPool).id, pick(fillPool).id, pick(fillPool).id], filler: true }); }
   const unknown = WORLD_IDS.filter((id) => !PROD[id]); if (unknown.length) console.warn('unknown products', unknown);
   const acc = new MeshAcc();      // shelves, counters … (cast shadows)
   const flat = new MeshAcc();     // walls, deco without shadow casting
@@ -1644,23 +1664,23 @@ function buildStore(scene, W) {
     const cs = [W.floor.a, W.floor.b];
     for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) { g.fillStyle = cs[(i + j) % 2]; g.fillRect(i * 128 + 3, j * 128 + 3, 122, 122); }
   });
-  tileTex.wrapS = tileTex.wrapT = T.RepeatWrapping; tileTex.repeat.set(60 / (W.floor.tile * 2), 50 / (W.floor.tile * 2));
+  tileTex.wrapS = tileTex.wrapT = T.RepeatWrapping; tileTex.repeat.set((2 * Wd) / (W.floor.tile * 2), D / (W.floor.tile * 2));
   if (W.ice) { const g = tileTex.userData.ctx; g.globalAlpha = 0.35; g.strokeStyle = '#ffffff'; g.lineWidth = 2; for (let i = 0; i < 14; i++) { g.beginPath(); const x = Math.random() * 256, y = Math.random() * 256; g.moveTo(x, y); g.lineTo(x + 30 - Math.random() * 60, y + 30 - Math.random() * 60); g.stroke(); } g.globalAlpha = 1; tileTex.needsUpdate = true; }
-  const floor = new T.Mesh(new T.PlaneGeometry(60, 50), new T.MeshLambertMaterial({ map: tileTex }));
-  floor.rotation.x = -PI / 2; floor.position.set(0, 0, 25); floor.receiveShadow = true; scene.add(floor);
+  const floor = new T.Mesh(new T.PlaneGeometry(2 * Wd, D), new T.MeshLambertMaterial({ map: tileTex }));
+  floor.rotation.x = -PI / 2; floor.position.set(0, 0, D / 2); floor.receiveShadow = true; scene.add(floor);
   // colored walkway stripe from the entrance
   const stripe = new T.Mesh(new T.PlaneGeometry(2.2, 10), new T.MeshLambertMaterial({ color: W.band }));
   stripe.rotation.x = -PI / 2; stripe.position.set(0, 0.004, 5); stripe.receiveShadow = true; scene.add(stripe);
   const outside = new T.Mesh(new T.PlaneGeometry(300, 300), new T.MeshLambertMaterial({ color: '#6f747c' }));
   outside.rotation.x = -PI / 2; outside.position.set(0, -0.02, 0); outside.receiveShadow = true; scene.add(outside);
 
-  const ceil = new T.Mesh(new T.PlaneGeometry(60, 50), new T.MeshLambertMaterial({ color: W.ceil }));
-  ceil.rotation.x = PI / 2; ceil.position.set(0, STORE.H, 25); scene.add(ceil);
+  const ceil = new T.Mesh(new T.PlaneGeometry(2 * Wd, D), new T.MeshLambertMaterial({ color: W.ceil }));
+  ceil.rotation.x = PI / 2; ceil.position.set(0, STORE.H, D / 2); scene.add(ceil);
   const lampAcc = new MeshAcc();
   const lampObj = new Obj();
-  for (const a of AISLES) for (let z = 3; z < 49; z += 4.5) lampObj.box(0.5, 0.06, 2.6, a.cx, STORE.H - 0.05, z, '#ffffff');
+  for (const a of AISLES) for (let z = 3; z < D - 1; z += 4.5) lampObj.box(0.5, 0.06, 2.6, a.cx, STORE.H - 0.05, z, '#ffffff');
   for (const g of [-8, 8]) for (let z = 3; z < 12; z += 4) lampObj.box(3, 0.06, 0.5, g, STORE.H - 0.05, z, '#ffffff');
-  if (W.skylight) for (let x = -24; x <= 24; x += 12) for (let z = 8; z <= 44; z += 12) lampObj.box(8, 0.05, 8, x, STORE.H - 0.03, z, '#ffffff');
+  if (W.skylight) for (let x = -Wd + 8; x <= Wd - 8; x += 12) for (let z = 8; z <= D - 6; z += 12) lampObj.box(8, 0.05, 8, x, STORE.H - 0.03, z, '#ffffff');
   lampAcc.addObj(lampObj);
   const lampMat = new T.MeshBasicMaterial({ color: W.skylight ? '#dff1ff' : W.ice ? '#e6f6ff' : '#fffdf2' });
   STORE_ANIM.lampMat = lampMat; STORE_ANIM.lampCol = lampMat.color.clone();
@@ -1676,24 +1696,24 @@ function buildStore(scene, W) {
     wo.box(w + 0.03, 0.25, d + 0.03, cx, 0.125, cz, kickC);
     addCol(cx - w / 2, cz - d / 2, cx + w / 2, cz + d / 2);
   };
-  wall(-30.2, 0, -30.2, 50); wall(30.2, 0, 30.2, 50); wall(-30, 50.2, 30, 50.2);
-  wall(-30, -0.2, -3, -0.2); wall(3, -0.2, 30, -0.2);
+  wall(-Wd - 0.2, 0, -Wd - 0.2, D); wall(Wd + 0.2, 0, Wd + 0.2, D); wall(-Wd, D + 0.2, Wd, D + 0.2);
+  wall(-Wd, -0.2, -3, -0.2); wall(3, -0.2, Wd, -0.2);
   wo.box(6, STORE.H - 3, 0.4, 0, 3 + (STORE.H - 3) / 2, -0.2, wallC);
   addCol(-3, -0.6, 3, -0.05); // invisible: you can't leave through the doors
   flat.addObj(wo);
 
   // exterior shell, roof, sign
   const ex = new Obj();
-  ex.box(61.2, 0.5, 51.2, 0, STORE.H + 0.35, 25, '#9aa0a8'); // roof (kept above the ceiling plane → no z-fighting)
+  ex.box(2 * Wd + 1.2, 0.5, D + 1.2, 0, STORE.H + 0.35, D / 2, '#9aa0a8'); // roof (kept above the ceiling plane → no z-fighting)
   for (const sx of [-1, 1]) {
-    ex.box(27.7, STORE.H + 1, 0.3, sx * 16.85, (STORE.H + 1) / 2, -0.55, W.facade);
+    ex.box(Wd - 2.3, STORE.H + 1, 0.3, sx * (Wd + 3.7) / 2, (STORE.H + 1) / 2, -0.55, W.facade);
     ex.box(2, STORE.H + 1.05, 0.4, sx * 4, (STORE.H + 1) / 2, -0.6, W.band);
-    ex.box(27.7, 0.6, 0.4, sx * 16.85, 0.3, -0.62, '#7b808a');
+    ex.box(Wd - 2.3, 0.6, 0.4, sx * (Wd + 3.7) / 2, 0.3, -0.62, '#7b808a');
     ex.box(0.25, 3.1, 0.5, sx * 3.1, 1.55, -0.6, '#2e3440');
   }
   ex.box(6, STORE.H - 2, 0.4, 0, 3 + (STORE.H - 2) / 2, -0.6, W.band);
   ex.box(6.4, 0.25, 0.5, 0, 3.1, -0.6, '#2e3440');
-  for (let x = -26; x <= 26; x += 6.5) if (Math.abs(x) > 6) ex.box(4.6, 2.2, 0.1, x, 2.0, -0.72, '#8fc6e8');
+  for (let x = -Wd + 4; x <= Wd - 4; x += 6.5) if (Math.abs(x) > 6) ex.box(4.6, 2.2, 0.1, x, 2.0, -0.72, '#8fc6e8');
   flat.addObj(ex);
   // car park deco
   rng = mulberry32(5);
@@ -1768,7 +1788,7 @@ function buildStore(scene, W) {
     }
     // printed category headers
     for (const s of [-1, 1]) {
-      const sec = SECTIONS[s < 0 ? gi : gi + 1][hf], num = hf * 7 + (s < 0 ? gi : gi + 1) + 1;
+      const sec = SECTIONS[s < 0 ? gi : gi + 1][hf], num = hf * nA + (s < 0 ? gi : gi + 1) + 1;
       so.box(0.8, 0.3, L - 1.2, gx + s * 0.4, 2.15, cz, sec.col);
       so.box(0.81, 0.03, L - 1.18, gx + s * 0.4, 2.31, cz, shade(sec.col, -0.15));
       for (const f of [0.25, 0.75]) so.label(1.7, 0.26, gx + s * 0.801, 2.15, za + 0.6 + (L - 1.2) * f, secLabel(sec, num), { ry: s * PI / 2 });
@@ -1819,41 +1839,42 @@ function buildStore(scene, W) {
     }
   }
   function wallShelf(xFront, s, hf) { // s = direction into the aisle (+1 left wall, -1 right wall)
-    const [za, zb] = HALVES[hf], a = s > 0 ? 0 : 6, sec = SECTIONS[a][hf];
+    const [za, zb] = HALVES[hf], a = s > 0 ? 0 : nA - 1, sec = SECTIONS[a][hf];
     const L = zb - za, cz = (za + zb) / 2, xb = xFront - s * 0.3;
     so.box(0.6, 0.12, L, xb, 0.06, cz, baseC);
     so.box(0.06, 2.3, L, xFront - s * 0.58, 1.15, cz, backC);
     for (const lv of SHELF_LEVELS) { so.box(0.56, 0.03, L, xb, lv - 0.015, cz, boardC); priceStrip(xFront - s * 0.01, lv, za, zb, s); }
     so.box(0.62, 0.32, L, xb, 2.35, cz, sec.col);
-    for (const f of [0.2, 0.5, 0.8]) so.label(1.9, 0.29, xFront + s * 0.011, 2.35, za + L * f, secLabel(sec, hf * 7 + a + 1), { ry: s * PI / 2 });
+    for (const f of [0.2, 0.5, 0.8]) so.label(1.9, 0.29, xFront + s * 0.011, 2.35, za + L * f, secLabel(sec, hf * nA + a + 1), { ry: s * PI / 2 });
     for (let z = za; z <= zb + 0.01; z += L / 4) upright(xFront - s * 0.03, z, 2.5);
     styleExtras(xFront - s * 0.76, za, zb, false, s);
     addCol(Math.min(xFront, xFront - s * 0.6), za, Math.max(xFront, xFront - s * 0.6), zb);
   }
   // faces (tagOff = where the price tags sit relative to the face line)
-  const face = (x, za, zb, nx, types, wallFace) => faces.push({ ax: x, az: za, bx: x, bz: zb, nx, nz: 0, types, tagOff: wallFace ? -0.008 : 0.055, levels: SHELF_LEVELS.map((y) => ({ y, inset: 0.22 })) });
-  for (let gi = 0; gi < GONDOLA_X.length; gi++) for (let h = 0; h < 2; h++) gondola(gi, h);
-  for (let h = 0; h < 2; h++) {
+  const face = (x, za, zb, nx, types, wallFace, filler) => faces.push({ ax: x, az: za, bx: x, bz: zb, nx, nz: 0, types, filler, tagOff: wallFace ? -0.008 : 0.055, levels: SHELF_LEVELS.map((y) => ({ y, inset: 0.22 })) });
+  for (let gi = 0; gi < GONDOLA_X.length; gi++) for (let h = 0; h < nH; h++) gondola(gi, h);
+  for (let h = 0; h < nH; h++) {
     const [za, zb] = HALVES[h];
-    wallShelf(-29.4, 1, h);
-    wallShelf(29.4, -1, h);
-    for (let a = 0; a < 7; a++) {
-      const sec = SECTIONS[a][h], A = AISLES[a];
-      const fz0 = a === 0 || a === 6 ? za + 0.4 : za + 0.6, fz1 = a === 0 || a === 6 ? zb - 0.4 : zb - 0.6;
-      face(A.x0, fz0, fz1, 1, sec.t.slice(0, 2), a === 0);
-      face(A.x1, fz1, fz0, -1, sec.t.slice(2, 4), a === 6);
-      for (const id of sec.t) PROD[id].section = sec.n;
+    wallShelf(-Wd + 0.6, 1, h);
+    wallShelf(Wd - 0.6, -1, h);
+    for (let a = 0; a < nA; a++) {
+      const sec = SECTIONS[a][h], A = AISLES[a], edge = a === 0 || a === nA - 1;
+      const fz0 = edge ? za + 0.4 : za + 0.6, fz1 = edge ? zb - 0.4 : zb - 0.6;
+      face(A.x0, fz0, fz1, 1, sec.t.slice(0, 2), a === 0, sec.filler);
+      face(A.x1, fz1, fz0, -1, sec.t.slice(2, 4), a === nA - 1, sec.filler);
+      if (!sec.filler) for (const id of sec.t) PROD[id].section = sec.n;
     }
   }
   // gaps between wall shelves & back/front: fill wall shelves only along the halves; cross aisle stays open
 
   // ---------- back-wall coolers ----------
-  const coolers = W.back.units;
+  const nu = W.back.units.length, uw = (2 * Wd - 3 - (nu - 1)) / nu;
+  const coolers = W.back.units.map((u, i) => Object.assign({}, u, { x0: -Wd + 1.5 + i * (uw + 1), x1: -Wd + 1.5 + i * (uw + 1) + uw }));
   const coolerGlass = W.back.style === 'cooler', frameC = W.back.frame || '#9aa3ad';
   for (const c of coolers) {
-    const L = c.x1 - c.x0, cx = (c.x0 + c.x1) / 2, zc = (COOLER_Z + 50) / 2, dz = 50 - COOLER_Z;
+    const L = c.x1 - c.x0, cx = (c.x0 + c.x1) / 2, zc = (COOLER_Z + D) / 2, dz = D - COOLER_Z;
     so.box(L, 0.2, dz, cx, 0.1, zc, '#3c4250');
-    so.box(L, 2.3, 0.05, cx, 1.15, 49.95, coolerGlass ? '#e6f2fb' : W.shelf === 'rack' ? '#9aa0a6' : '#fbf8f2');
+    so.box(L, 2.3, 0.05, cx, 1.15, D - 0.05, coolerGlass ? '#e6f2fb' : W.shelf === 'rack' ? '#9aa0a6' : '#fbf8f2');
     so.box(L, 0.25, dz, cx, 2.42, zc, c.col);
     for (const lv of [0.25, 0.7, 1.15, 1.6]) {
       so.box(L, 0.03, dz - 0.2, cx, lv - 0.015, zc + 0.1, '#f4f7fa');
@@ -1867,7 +1888,7 @@ function buildStore(scene, W) {
     for (let i = 0; i <= nd; i++) so.box(coolerGlass ? 0.06 : 0.1, 2.2, 0.08, c.x0 + (i * L) / nd, 1.2, COOLER_Z - 0.02, frameC);
     if (coolerGlass) for (let i = 0; i < nd; i++) { go.box(L / nd - 0.06, 2.0, 0.02, c.x0 + ((i + 0.5) * L) / nd, 1.2, COOLER_Z - 0.03, '#ffffff'); so.box(0.03, 0.5, 0.05, c.x0 + ((i + 0.85) * L) / nd, 1.2, COOLER_Z - 0.09, '#cfd6dc'); }
     glassAcc.addObj(go);
-    addCol(c.x0, COOLER_Z, c.x1, 50.4);
+    addCol(c.x0, COOLER_Z, c.x1, D + 0.4);
     faces.push({ ax: c.x1 - 0.2, az: COOLER_Z, bx: c.x0 + 0.2, bz: COOLER_Z, nx: 0, nz: -1, types: c.t, tagOff: -0.188, levels: [0.25, 0.7, 1.15, 1.6].map((y) => ({ y, inset: 0.4 })) });
     for (const id of c.t) PROD[id].section = c.n;
   }
@@ -1877,7 +1898,7 @@ function buildStore(scene, W) {
   // gaps between the back units
   for (let i = 0; i + 1 < coolers.length; i++) {
     const g0 = coolers[i].x1, g1 = coolers[i + 1].x0;
-    so.box(g1 - g0, 2.4, 1.2, (g0 + g1) / 2, 1.2, 49.4, '#c3c8cf'); addCol(g0, COOLER_Z, g1, 50);
+    so.box(g1 - g0, 2.4, 1.2, (g0 + g1) / 2, 1.2, D - 0.6, '#c3c8cf'); addCol(g0, COOLER_Z, g1, D);
   }
 
   // ---------- front area (produce / garden / food court / freezer chests) ----------
@@ -1887,7 +1908,9 @@ function buildStore(scene, W) {
     fitText(g, p.n, x0 + w * 0.62, y0 + h * 0.34, w * 0.55, h * 0.24, 700, '"Chalkboard SE", "Comic Sans MS", cursive');
     g.fillStyle = '#ffd84a'; fitText(g, p.price.toFixed(2).replace('.', ',') + ' €', x0 + w / 2, y0 + h * 0.74, w * 0.8, h * 0.34, 900, '"Chalkboard SE", "Comic Sans MS", cursive');
   }, false, '#2b2b2b');
-  const produce = W.front.items, fst = W.front.style;
+  const fsd = -CHECK, frontXs = fsd > 0 ? [Wd - 20, Wd - 13, Wd - 6] : [-Wd + 6, -Wd + 13, -Wd + 20];
+  const produce = W.front.items.map(([, a, b], i) => [frontXs[i], a, b]), fst = W.front.style;
+  FRONT_X = frontXs[1];
   for (const [tx, a, b] of produce) {
     const za = 4.5, zb = 9.5, cz = 7;
     const wood = fst === 'food' ? '#f4f4f4' : '#a8703e', dark = fst === 'food' ? '#e8322b' : '#7a4a26';
@@ -1927,7 +1950,8 @@ function buildStore(scene, W) {
   }
 
   // ---------- checkouts ----------
-  const counterXs = [-27, -21, -15, -9];
+  const cx0 = CHECK < 0 ? -Wd + 3 : Wd - 21;
+  const counterXs = [cx0, cx0 + 6, cx0 + 12, cx0 + 18];
   const candy = W.candy;
   const bagLabel = atlasLabel(1.25, (g, x, y, w, h) => { g.fillStyle = '#f4f4f4'; g.fillRect(x, y, w, h); g.fillStyle = W.band; g.textAlign = 'center'; g.textBaseline = 'middle'; fitText(g, W.short[0], x + w / 2, y + h * 0.35, w * 0.9, h * 0.35); fitText(g, W.short[1], x + w / 2, y + h * 0.7, w * 0.9, h * 0.35); }, false, '#f4f4f4');
   for (let i = 0; i < counterXs.length; i++) {
@@ -1999,8 +2023,10 @@ function buildStore(scene, W) {
       LANES.push(lane);
     }
   }
-  so.box(2.4, 1.1, 6, -28.8, 0.55, 7, '#6b4226'); addCol(-30, 4, -27.6, 10); // info booth next to the wall
-  so.box(2.4, 0.1, 6, -28.8, 1.15, 7, '#a8703e');
+  { // info booth between the outer counter and the wall
+    const bx0 = CHECK < 0 ? -Wd : cx0 + 18.6, bx1 = CHECK < 0 ? cx0 - 0.6 : Wd, bc = (bx0 + bx1) / 2, bw = bx1 - bx0;
+    so.box(bw, 1.1, 6, bc, 0.55, 7, '#6b4226'); so.box(bw, 0.1, 6, bc, 1.15, 7, '#a8703e'); addCol(bx0, 4, bx1, 10);
+  }
 
   // ---------- entrance deco: parked carts, plants, flower stand ----------
   const dc = new Obj();
@@ -2025,17 +2051,25 @@ function buildStore(scene, W) {
   dc.cyl(0.25, 0.8, 5.6, 0.4, 0.8, '#3a3f4a', { seg: 10 }); dc.cyl(0.27, 0.08, 5.6, 0.84, 0.8, W.band, { seg: 10 }); dc.cyl(0.12, 0.02, 5.6, 0.885, 0.8, '#111', { seg: 8 });
   addCol(5.3, 0.5, 5.9, 1.1);
   // ---------- world extras ----------
-  if (W.fountain) { // round fountain right in front of the entrance – drive around it!
-    const fx = 0, fz = 9.4;
+  if (W.layout.boulevard) { // big fountain in the middle of the boulevard
+    const fx = 0, fz = (HALVES[1][0] + HALVES[1][1]) / 2;
+    for (const z of [HALVES[0][0] + 2, HALVES[2][1] - 2]) for (const x of [-7, 7]) { // benches
+      dc.box(2.4, 0.08, 0.6, x, 0.45, z, '#c9a96a'); dc.box(2.4, 0.5, 0.08, x, 0.7, z + 0.28, '#c9a96a');
+      for (const sx of [-1, 1]) dc.box(0.08, 0.45, 0.6, x + sx * 1.1, 0.22, z, '#3a3f4a');
+      addCol(x - 1.2, z - 0.32, x + 1.2, z + 0.32);
+    }
+    dc.cyl(4.2, 0.02, fx, 0.01, fz, '#c9a96a', { seg: 20 });
+    dc.cyl(2.6, 0.55, fx, 0.27, fz, '#e9e2d6', { seg: 20 }); dc.cyl(2.45, 0.05, fx, 0.5, fz, '#4fb0ff', { seg: 20 });
+    addCol(fx - 2.4, fz - 2.4, fx + 2.4, fz + 2.4);
     dc.cyl(1.35, 0.5, fx, 0.25, fz, '#e9e2d6', { seg: 16 }); dc.cyl(1.2, 0.05, fx, 0.47, fz, '#4fb0ff', { seg: 16 });
     dc.cyl(0.25, 1.2, fx, 0.9, fz, '#e9e2d6', { seg: 10 }); dc.cyl(0.6, 0.12, fx, 1.5, fz, '#e9e2d6', { seg: 12 }); dc.cyl(0.5, 0.03, fx, 1.57, fz, '#4fb0ff', { seg: 12 });
     dc.cyl(0.1, 0.5, fx, 1.8, fz, '#bfe6ff', { seg: 8, rt: 0.3 });
     for (let k = 0; k < 8; k++) { const a = (k / 8) * TAU; dc.cyl(0.03, 0.4, fx + Math.cos(a) * 0.45, 1.25, fz + Math.sin(a) * 0.45, '#bfe6ff', { seg: 5, rz: Math.cos(a) * 0.5, rx: -Math.sin(a) * 0.5 }); }
     addCol(fx - 1.2, fz - 1.2, fx + 1.2, fz + 1.2);
-    for (const x of [-11.5, 11.5]) { // palms
-      dc.cyl(0.5, 0.6, x, 0.3, 12.2, '#c9a96a', { seg: 10 }); dc.cyl(0.12, 2.6, x, 1.9, 12.2, '#8a6a3a', { seg: 7, rt: 0.8 });
-      for (let k = 0; k < 7; k++) { const a = (k / 7) * TAU; dc.add(geoCone(4), x + Math.cos(a) * 0.6, 3.1, 12.2 + Math.sin(a) * 0.6, 0.18, 1.4, 0.05, '#3f9b3a', -Math.sin(a) * 1.2, 0, Math.cos(a) * 1.2); }
-      addCol(x - 0.5, 11.7, x + 0.5, 12.7);
+    for (const [x, z] of [[-11.5, 12.2], [11.5, 12.2], [-12, 27], [12, 27], [-12, 41.5], [12, 41.5]]) { // palms along the boulevard
+      dc.cyl(0.5, 0.6, x, 0.3, z, '#c9a96a', { seg: 10 }); dc.cyl(0.12, 2.6, x, 1.9, z, '#8a6a3a', { seg: 7, rt: 0.8 });
+      for (let k = 0; k < 7; k++) { const a = (k / 7) * TAU; dc.add(geoCone(4), x + Math.cos(a) * 0.6, 3.1, z + Math.sin(a) * 0.6, 0.18, 1.4, 0.05, '#3f9b3a', -Math.sin(a) * 1.2, 0, Math.cos(a) * 1.2); }
+      addCol(x - 0.5, z - 0.5, x + 0.5, z + 0.5);
     }
   }
   if (W.shelf === 'rack') { // pallets near the entrance + a parked forklift
@@ -2052,7 +2086,7 @@ function buildStore(scene, W) {
       for (let k = 0; k < 4; k++) dc.box(0.6, 0.45, 0.6, x + (k % 2) * 0.62 - 0.3, 0.225 + Math.floor(k / 2) * 0.46, z, '#bfe6ff', { ry: k * 0.1 });
       addCol(x - 0.65, z - 0.35, x + 0.65, z + 0.35);
     }
-    for (let x = -29; x < 30; x += 1.3) for (const zz of [0.25, 49.75]) dc.cone(0.06, 0.3 + (Math.abs(x * 7) % 3) * 0.12, x, STORE.H - 0.25, zz, '#e6f7ff', { rx: PI, seg: 5 });
+    for (let x = -Wd + 1; x < Wd; x += 1.3) for (const zz of [0.25, D - 0.25]) dc.cone(0.06, 0.3 + (Math.abs(x * 7) % 3) * 0.12, x, STORE.H - 0.25, zz, '#e6f7ff', { rx: PI, seg: 5 });
   }
   flat.addObj(dc);
 
@@ -2121,7 +2155,7 @@ function placeFace(f, inst, so) {
       so.label(0.08, 0.032, x + f.nx * 0.001, lv.y - 0.022, z + f.nz * 0.001, PRICE_UV[p.idx], { ry: yaw });
     }
     // pickup spot: segment along the shelf front
-    SPOTS[id] = {
+    if (!f.filler) SPOTS[id] = {
       ax: f.ax + ux * (s0 + 0.2), az: f.az + uz * (s0 + 0.2), bx: f.ax + ux * (s0 + bl - 0.2), bz: f.az + uz * (s0 + bl - 0.2),
       nx: f.nx, nz: f.nz, mx: f.ax + ux * (s0 + bl / 2), mz: f.az + uz * (s0 + bl / 2), y: f.levels[Math.min(2, f.levels.length - 1)].y,
     };
@@ -2156,7 +2190,7 @@ function hangSign(scene, tex, x, y, z, ry, wdt = 2.6, both = true) {
 }
 function buildSigns(scene, coolers, W) {
   let n = 1;
-  for (let h = 0; h < 2; h++) for (let a = 0; a < 7; a++) {
+  for (let h = 0; h < HALVES.length; h++) for (let a = 0; a < AISLES.length; a++) {
     const s = SECTIONS[a][h], [za, zb] = HALVES[h];
     s.num = n;
     hangSign(scene, signTex(s.n, s.e, 'GANG ' + n++, s.col), AISLES[a].cx, 3.2, za + 0.4, 0);
@@ -2164,10 +2198,10 @@ function buildSigns(scene, coolers, W) {
   }
   for (const c of coolers) {
     const m = new T.Mesh(new T.PlaneGeometry(3.6, 3.6 * 200 / 512), new T.MeshBasicMaterial({ map: signTex(c.n, c.e, W.back.tag, c.col) }));
-    m.position.set((c.x0 + c.x1) / 2, 3.3, 49.9); m.rotation.y = PI; scene.add(m);
+    m.position.set((c.x0 + c.x1) / 2, 3.3, STORE.D1 - 0.1); m.rotation.y = PI; scene.add(m);
   }
-  hangSign(scene, signTex('Kasse', '🛒', 'BEZAHLEN', '#e8322b'), -18, 3.4, 11.2, 0, 3.4);
-  hangSign(scene, signTex(W.front.n, W.front.e, W.front.sub, W.front.col), 17, 3.4, 11.2, 0, 3.4);
+  hangSign(scene, signTex('Kasse', '🛒', 'BEZAHLEN', '#e8322b'), LANES[1].x, 3.4, 11.2, 0, 3.4);
+  hangSign(scene, signTex(W.front.n, W.front.e, W.front.sub, W.front.col), FRONT_X, 3.4, 11.2, 0, 3.4);
   hangSign(scene, signTex('Willkommen!', '👋', W.logo, W.band), 0, 3.6, 0.6, 0, 3.2, false);
   // wall posters
   const posters = W.posters;
@@ -2179,8 +2213,8 @@ function buildSigns(scene, coolers, W) {
     });
     const m = new T.Mesh(new T.PlaneGeometry(1.2, 1.5), new T.MeshBasicMaterial({ map: tex }));
     const side = i % 2 ? 1 : -1;
-    m.position.set(0, 3.6, 10 + i * 9);
-    m.position.x = side > 0 ? 29.95 : -29.95; m.rotation.y = side > 0 ? -PI / 2 : PI / 2;
+    m.position.set(0, 3.6, 10 + i * ((STORE.D1 - 15) / 4));
+    m.position.x = side > 0 ? STORE.W1 - 0.05 : STORE.W0 + 0.05; m.rotation.y = side > 0 ? -PI / 2 : PI / 2;
     scene.add(m);
   });
 }
@@ -2674,12 +2708,12 @@ function setupHazards(scene, level) {
   makeHazardLabels();
   const cfg = levelCfg(level);
   rng = mulberry32(1000 + level * 17);
-  const aisleSpot = () => { const a = RI(0, 6), h = RI(0, 1), A = AISLES[a]; const [za, zb] = HALVES[h]; return { a, h, A, za, zb }; };
+  const aisleSpot = () => { const a = RI(0, AISLES.length - 1), h = RI(0, HALVES.length - 1), A = AISLES[a]; const [za, zb] = HALVES[h]; return { a, h, A, za, zb }; };
   // ---- wet floor ----
   for (let i = 0; i < cfg.puddles; i++) {
     let x, z;
     if (rng() < 0.7) { const s = aisleSpot(); x = s.A.cx + R(-1.2, 1.2); z = R(s.za + 2, s.zb - 2); }
-    else { x = R(-26, 26); z = rng() < 0.5 ? R(28, 30) : R(45.5, 47); }
+    else { x = R(STORE.W0 + 4, STORE.W1 - 4); z = pick(CROSS.slice(1)) + R(-0.8, 0.8); }
     const rx = R(1.1, 1.9), rz = R(1.4, 2.4);
     const m = new T.Mesh(new T.CircleGeometry(1, 14), puddleMat);
     m.rotation.x = -PI / 2; m.scale.set(rx, rz, 1); m.position.set(x, 0.012, z); HZ.group.add(m);
@@ -2705,14 +2739,14 @@ function setupHazards(scene, level) {
     p.arms[0].rotation.x = p.arms[1].rotation.x = -1.1;
     let path;
     if (rng() < 0.75) { const s = aisleSpot(); const x = s.A.cx + R(-1.4, 1.4); path = { ax: x, az: s.za + 0.8, bx: x, bz: s.zb - 0.8 }; }
-    else { const z = rng() < 0.5 ? 29 : 46.3; path = { ax: R(-27, -5), az: z, bx: R(5, 27), bz: z }; }
+    else { const z = pick(CROSS.slice(1)); path = { ax: R(STORE.W0 + 3, -5), az: z, bx: R(5, STORE.W1 - 3), bz: z }; }
     const sh = { kind: 'shopper', p, path, t: rng(), dir: rng() < 0.5 ? 1 : -1, speed: R(0.9, 1.4), turn: 0, bump: 0, col: { x: 0, z: 0, r: 0.7 } };
     sh.len = Math.hypot(path.bx - path.ax, path.bz - path.az);
     HZ.group.add(p.g); HZ.shoppers.push(sh); DYN_CIRCLES.push(sh.col);
   }
   const pathFor = (aislesOnly) => {
     if (aislesOnly || rng() < 0.7) { const s = aisleSpot(); const x = s.A.cx + R(-1.2, 1.2); return { ax: x, az: s.za + 0.8, bx: x, bz: s.zb - 0.8 }; }
-    const z = rng() < 0.5 ? 29 : 46.3; return { ax: R(-27, -5), az: z, bx: R(5, 27), bz: z };
+    const z = pick(CROSS.slice(1)); return { ax: R(STORE.W0 + 3, -5), az: z, bx: R(5, STORE.W1 - 3), bz: z };
   };
   const addMover = (kind, p, path, speed, r, extra = {}) => {
     const sh = Object.assign({ kind, p, path, t: rng(), dir: rng() < 0.5 ? 1 : -1, speed, turn: 0, bump: 0, col: { x: 0, z: 0, r } }, extra);
@@ -2818,9 +2852,10 @@ function updateHazards(dt, time, cx, cz, speed, onFall) {
     if (sh.kind === 'kid') { // run from one random spot to the next
       if (sh.bump <= 0) {
         if (!sh.way || !sh.way.length) { // new target: always walk via the cross aisles (never through shelves)
-          const a = AISLES[RI(0, 6)], tx = a.cx + R(-1.4, 1.4), tz = rng() < 0.5 ? pick([12, 29, 46.3]) : R(HALVES[RI(0, 1)][0] + 1, HALVES[1][1] - 1);
-          const cross = [12, 29, 46.3].reduce((b, c) => (Math.abs(c - sh.z) < Math.abs(b - sh.z) ? c : b), 12);
-          const tcross = [12, 29, 46.3].reduce((b, c) => (Math.abs(c - tz) < Math.abs(b - tz) ? c : b), 12);
+          const hf = HALVES[RI(0, HALVES.length - 1)];
+          const a = AISLES[RI(0, AISLES.length - 1)], tx = a.cx + R(-1.2, 1.2), tz = rng() < 0.5 ? pick(CROSS) : R(hf[0] + 1, hf[1] - 1);
+          const near = (zz) => CROSS.reduce((b, c) => (Math.abs(c - zz) < Math.abs(b - zz) ? c : b), CROSS[0]);
+          const cross = near(sh.z), tcross = near(tz);
           sh.way = Math.abs(tx - sh.x) > 2.5 ? [[sh.x, cross], [tx, cross], [tx, tcross], [tx, tz]] : [[tx, tz]];
         }
         const [wx, wz] = sh.way[0], dx = wx - sh.x, dz = wz - sh.z, d = Math.hypot(dx, dz);
@@ -3556,6 +3591,7 @@ function showMenu() {
   ['hud', 'pause', 'dead', 'result', 'worlds', 'settings', 'credits', 'count'].forEach((id) => show(id, false));
   show('menu'); setCine(false); setPrompt(null);
   setupLevel(1);
+  MENU_POS.z = CROSS[1];
   resetCart(MENU_POS.x, MENU_POS.z, PI / 2);
 }
 let selWorld = 'std';
@@ -3740,7 +3776,8 @@ function nextLevel() {
   G.items = [];
   // drive back to the start in a cutscene
   const lx = C.x;
-  const pts = [[lx, C.z], [lx, 4.6], [lx + 1.4, 2.5], [-10, 2.5], [-7.2, 3.6], [-3.2, 3.0], [-1.4, 2.0], [-0.2, 2.5], [START.x, START.z]].map(([x, z]) => new V3(x, 0, z));
+  const sg = Math.sign(lx) || -1; // mirror the route when the checkouts are on the right
+  const pts = [[lx, C.z], [lx, 4.6], [lx - sg * 1.4, 2.5], [sg * 10, 2.5], [sg * 7.2, 3.6], [sg * 3.2, 3.0], [sg * 1.4, 2.0], [sg * 0.2, 2.5], [START.x, START.z]].map(([x, z]) => new V3(x, 0, z));
   G.state = 'outro';
   G.out = { curve: new T.CatmullRomCurve3(pts, false, 'centripetal', 0.5), t: 0, dur: 4.2 };
   setCine(true);
@@ -4209,7 +4246,7 @@ const EV = (() => {
   // islands: in the cross aisle (z 29) or the back aisle (z 46.3) at an aisle center
   function moveProduct(p) {
     const cands = [];
-    for (let a = 0; a < 7; a++) for (const z of [29, 46.3]) cands.push({ a, x: AISLES[a].cx, z });
+    for (let a = 0; a < AISLES.length; a++) for (const z of CROSS.slice(1)) cands.push({ a, x: AISLES[a].cx, z });
     const ok = cands.filter((c) => Math.hypot(c.x - C.x, c.z - C.z) > 9 && !islands.some((i) => i.a === c.a && i.z === c.z));
     if (!ok.length) return;
     const c = pick(ok);
@@ -4232,7 +4269,7 @@ const EV = (() => {
     if (G.markers[p.id]) scene.remove(G.markers[p.id].g);
     G.markers[p.id] = makeMarker(SPOTS[p.id]);
     G.markers[p.id].arrow.position.set(c.x, 2.3, c.z);
-    const where = c.z < 40 ? `im mittleren Quergang bei Gang ${c.a + 1}` : `im hinteren Gang bei Gang ${c.a + 8}`;
+    const where = c.z < CROSS[CROSS.length - 1] - 1 ? `in einem Quergang bei Gang ${c.a + 1}` : `im hinteren Gang`;
     announce(`${p.e} <b>${p.n}</b> wurde umgeräumt – jetzt auf einer Aktionsinsel ${where}!`, 6000);
     const li = $('li_' + p.id); if (li) li.classList.add('moved');
   }

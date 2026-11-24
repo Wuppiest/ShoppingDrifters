@@ -489,6 +489,7 @@ function showMenu() {
   ['hud', 'pause', 'dead', 'result', 'worlds', 'settings', 'credits', 'count'].forEach((id) => show(id, false));
   show('menu'); setCine(false); setPrompt(null);
   setupLevel(1);
+  MENU_POS.z = CROSS[1];
   resetCart(MENU_POS.x, MENU_POS.z, PI / 2);
 }
 let selWorld = 'std';
@@ -673,7 +674,8 @@ function nextLevel() {
   G.items = [];
   // drive back to the start in a cutscene
   const lx = C.x;
-  const pts = [[lx, C.z], [lx, 4.6], [lx + 1.4, 2.5], [-10, 2.5], [-7.2, 3.6], [-3.2, 3.0], [-1.4, 2.0], [-0.2, 2.5], [START.x, START.z]].map(([x, z]) => new V3(x, 0, z));
+  const sg = Math.sign(lx) || -1; // mirror the route when the checkouts are on the right
+  const pts = [[lx, C.z], [lx, 4.6], [lx - sg * 1.4, 2.5], [sg * 10, 2.5], [sg * 7.2, 3.6], [sg * 3.2, 3.0], [sg * 1.4, 2.0], [sg * 0.2, 2.5], [START.x, START.z]].map(([x, z]) => new V3(x, 0, z));
   G.state = 'outro';
   G.out = { curve: new T.CatmullRomCurve3(pts, false, 'centripetal', 0.5), t: 0, dur: 4.2 };
   setCine(true);

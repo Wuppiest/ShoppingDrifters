@@ -139,7 +139,7 @@ const EV = (() => {
   // islands: in the cross aisle (z 29) or the back aisle (z 46.3) at an aisle center
   function moveProduct(p) {
     const cands = [];
-    for (let a = 0; a < 7; a++) for (const z of [29, 46.3]) cands.push({ a, x: AISLES[a].cx, z });
+    for (let a = 0; a < AISLES.length; a++) for (const z of CROSS.slice(1)) cands.push({ a, x: AISLES[a].cx, z });
     const ok = cands.filter((c) => Math.hypot(c.x - C.x, c.z - C.z) > 9 && !islands.some((i) => i.a === c.a && i.z === c.z));
     if (!ok.length) return;
     const c = pick(ok);
@@ -162,7 +162,7 @@ const EV = (() => {
     if (G.markers[p.id]) scene.remove(G.markers[p.id].g);
     G.markers[p.id] = makeMarker(SPOTS[p.id]);
     G.markers[p.id].arrow.position.set(c.x, 2.3, c.z);
-    const where = c.z < 40 ? `im mittleren Quergang bei Gang ${c.a + 1}` : `im hinteren Gang bei Gang ${c.a + 8}`;
+    const where = c.z < CROSS[CROSS.length - 1] - 1 ? `in einem Quergang bei Gang ${c.a + 1}` : `im hinteren Gang`;
     announce(`${p.e} <b>${p.n}</b> wurde umgeräumt – jetzt auf einer Aktionsinsel ${where}!`, 6000);
     const li = $('li_' + p.id); if (li) li.classList.add('moved');
   }

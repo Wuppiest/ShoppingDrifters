@@ -6,7 +6,8 @@ const S = (n, e, col, t) => ({ n, e, col, t });
 const WORLDS = {
   // ---------------------------------------------------------------- Drift-Markt
   std: {
-    id: 'std', name: 'Drift-Markt', logo: 'DRIFT-MARKT', short: ['DRIFT', 'MARKT'],
+    id: 'std', name: 'Drift-Markt',
+    layout: { W: 30, D: 50, gond: [-20, -12, -4, 4, 12, 20], halves: [[14, 27], [31, 44]], check: -1 }, logo: 'DRIFT-MARKT', short: ['DRIFT', 'MARKT'],
     H: 5.6, wall: '#f1ece0', band: '#1aa39a', kick: '#8a8f99', ceil: '#cfccc4', facade: '#e9e2d0',
     floor: { a: '#ece8df', b: '#e2ddd2', grout: '#cfc9bd', tile: 2 },
     fog: ['#e9e4d8', 28, 75], light: { hemi: ['#ffffff', '#b3a58e', 1.55], sun: ['#fff4e2', 1.5], bg: '#a9d8ff' },
@@ -32,7 +33,9 @@ const WORLDS = {
   },
   // ---------------------------------------------------------------- Baumarkt
   bau: {
-    id: 'bau', name: 'Baumarkt', logo: 'BAU-DRIFT', short: ['BAU', 'DRIFT'],
+    id: 'bau', name: 'Baumarkt',
+    // huge hall, very wide aisles, three blocks of racks, checkouts on the right
+    layout: { W: 38, D: 64, gond: [-27, -16, -5.5, 5.5, 16, 27], halves: [[15, 28], [33, 45], [50, 57]], check: 1 }, logo: 'BAU-DRIFT', short: ['BAU', 'DRIFT'],
     H: 6.8, wall: '#e6e2d6', band: '#ff7a00', kick: '#555b66', ceil: '#8a8f99', facade: '#d9d4c4',
     floor: { a: '#b9b6ae', b: '#b3b0a8', grout: '#8f8c85', tile: 4 },
     fog: ['#d8d4c8', 30, 80], light: { hemi: ['#ffffff', '#9a9488', 1.5], sun: ['#ffffff', 1.4], bg: '#a9d8ff' },
@@ -57,7 +60,9 @@ const WORLDS = {
   },
   // ---------------------------------------------------------------- Mega-Mall
   mall: {
-    id: 'mall', name: 'Mega-Mall', logo: 'DRIFT-MALL', short: ['DRIFT', 'MALL'],
+    id: 'mall', name: 'Mega-Mall',
+    // wide boulevard in the middle with the fountain, shops on both sides
+    layout: { W: 40, D: 58, gond: [-33, -25, -17, 17, 25, 33], halves: [[14, 24], [29, 39], [44, 51]], check: -1, boulevard: true }, logo: 'DRIFT-MALL', short: ['DRIFT', 'MALL'],
     H: 9, wall: '#f6f1ea', band: '#b34fe0', kick: '#3a3f4a', ceil: '#f4f1ea', facade: '#ece6dc', skylight: true,
     floor: { a: '#f4f1ec', b: '#d9d2c8', grout: '#c9a96a', tile: 3 },
     fog: ['#f1ece4', 35, 90], light: { hemi: ['#fffaf0', '#c8b8a0', 1.7], sun: ['#fff8ec', 1.6], bg: '#9fd4ff' },
@@ -79,12 +84,13 @@ const WORLDS = {
     front: { style: 'food', n: 'Food-Court', e: '🍔', sub: 'SNACKS', col: '#e8322b', items: [[10, 'burger', 'pizzastueck'], [17, 'donut', 'smoothie'], [24, 'slush', 'popcorn_m']] },
     candy: ['schoko', 'gummi', 'lolli', 'kopfhoerer', 'ladekabel'],
     posters: [['SALE', '-70%', '#e8322b'], ['NEU', 'Phone 9', '#1d2230'], ['KINO', 'Drift Movie', '#8a6bd6'], ['FOOD', 'Burger!', '#ff8a1f']],
-    fountain: true,
     desc: 'Riesig, glänzend, mit Brunnen und Food-Court.', icon: '🛍️', grad: ['#b34fe0', '#ff7eb6'],
   },
   // ---------------------------------------------------------------- Tiefkühl-Lager
   frost: {
-    id: 'frost', name: 'Tiefkühl-Lager', logo: 'FROST-LAGER', short: ['FROST', 'LAGER'],
+    id: 'frost', name: 'Tiefkühl-Lager',
+    // narrow and deep: many tight freezer aisles, long runs, checkouts on the right
+    layout: { W: 25, D: 66, gond: [-19.5, -14, -8.5, -3, 3, 8.5, 14, 19.5], halves: [[14, 37], [42, 60]], check: 1 }, logo: 'FROST-LAGER', short: ['FROST', 'LAGER'],
     H: 6, wall: '#e6f2fb', band: '#4fb0ff', kick: '#3a5a7a', ceil: '#a9c2d4', facade: '#dfeaf2',
     floor: { a: '#d6ecf6', b: '#c4e0ee', grout: '#a9c8da', tile: 2 },
     fog: ['#d6ebf7', 18, 60], light: { hemi: ['#eaf6ff', '#8fb0c8', 1.6], sun: ['#e6f4ff', 1.3], bg: '#cfe8ff' },

@@ -52,10 +52,10 @@ Wird automatisch erkannt (am besten im Querformat). Sobald die Tastatur benutzt 
 ## Welten
 | Welt | Besonderheit |
 |---|---|
-| 🛒 Drift-Markt | Der ganz normale Supermarkt |
-| 🔨 Baumarkt | Hohe Schwerlastregale, Paletten, Gartencenter, Farben in mehreren Tönen |
-| 🛍️ Mega-Mall | Glasdach, Brunnen direkt am Start, Food-Court, Mode, Bücher, Elektronik |
-| 🧊 Tiefkühl-Lager | Glastür-Kühlregale, Gefriertruhen – **der Boden ist überall rutschig** |
+| 🛒 Drift-Markt | Der ganz normale Supermarkt (60 × 50 m, 7 Gänge, 2 Blöcke) |
+| 🔨 Baumarkt | Riesige Halle (76 × 64 m), extra breite Gänge, 3 Regalblöcke, Kassen rechts, Schwerlastregale, Gartencenter |
+| 🛍️ Mega-Mall | 80 × 58 m, breiter Boulevard in der Mitte mit Brunnen, Palmen und Bänken, Läden links und rechts |
+| 🧊 Tiefkühl-Lager | Schmal und tief (50 × 66 m), 9 enge Gänge mit langen Geraden, Kassen rechts – **der Boden ist überall rutschig** |
 
 ## Stil-Punkte
 Oben in der Mitte zählen Stil-Punkte. Jeder Trick erhöht die Combo (bis x5), ein harter Crash oder die Oma zerstören sie.

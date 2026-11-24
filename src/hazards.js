@@ -143,12 +143,12 @@ function setupHazards(scene, level) {
   makeHazardLabels();
   const cfg = levelCfg(level);
   rng = mulberry32(1000 + level * 17);
-  const aisleSpot = () => { const a = RI(0, 6), h = RI(0, 1), A = AISLES[a]; const [za, zb] = HALVES[h]; return { a, h, A, za, zb }; };
+  const aisleSpot = () => { const a = RI(0, AISLES.length - 1), h = RI(0, HALVES.length - 1), A = AISLES[a]; const [za, zb] = HALVES[h]; return { a, h, A, za, zb }; };
   // ---- wet floor ----
   for (let i = 0; i < cfg.puddles; i++) {
     let x, z;
     if (rng() < 0.7) { const s = aisleSpot(); x = s.A.cx + R(-1.2, 1.2); z = R(s.za + 2, s.zb - 2); }
-    else { x = R(-26, 26); z = rng() < 0.5 ? R(28, 30) : R(45.5, 47); }
+    else { x = R(STORE.W0 + 4, STORE.W1 - 4); z = pick(CROSS.slice(1)) + R(-0.8, 0.8); }
     const rx = R(1.1, 1.9), rz = R(1.4, 2.4);
     const m = new T.Mesh(new T.CircleGeometry(1, 14), puddleMat);
     m.rotation.x = -PI / 2; m.scale.set(rx, rz, 1); m.position.set(x, 0.012, z); HZ.group.add(m);
@@ -174,14 +174,14 @@ function setupHazards(scene, level) {
     p.arms[0].rotation.x = p.arms[1].rotation.x = -1.1;
     let path;
     if (rng() < 0.75) { const s = aisleSpot(); const x = s.A.cx + R(-1.4, 1.4); path = { ax: x, az: s.za + 0.8, bx: x, bz: s.zb - 0.8 }; }
-    else { const z = rng() < 0.5 ? 29 : 46.3; path = { ax: R(-27, -5), az: z, bx: R(5, 27), bz: z }; }
+    else { const z = pick(CROSS.slice(1)); path = { ax: R(STORE.W0 + 3, -5), az: z, bx: R(5, STORE.W1 - 3), bz: z }; }
     const sh = { kind: 'shopper', p, path, t: rng(), dir: rng() < 0.5 ? 1 : -1, speed: R(0.9, 1.4), turn: 0, bump: 0, col: { x: 0, z: 0, r: 0.7 } };
     sh.len = Math.hypot(path.bx - path.ax, path.bz - path.az);
     HZ.group.add(p.g); HZ.shoppers.push(sh); DYN_CIRCLES.push(sh.col);
   }
   const pathFor = (aislesOnly) => {
     if (aislesOnly || rng() < 0.7) { const s = aisleSpot(); const x = s.A.cx + R(-1.2, 1.2); return { ax: x, az: s.za + 0.8, bx: x, bz: s.zb - 0.8 }; }
-    const z = rng() < 0.5 ? 29 : 46.3; return { ax: R(-27, -5), az: z, bx: R(5, 27), bz: z };
+    const z = pick(CROSS.slice(1)); return { ax: R(STORE.W0 + 3, -5), az: z, bx: R(5, STORE.W1 - 3), bz: z };
   };
   const addMover = (kind, p, path, speed, r, extra = {}) => {
     const sh = Object.assign({ kind, p, path, t: rng(), dir: rng() < 0.5 ? 1 : -1, speed, turn: 0, bump: 0, col: { x: 0, z: 0, r } }, extra);
@@ -287,9 +287,10 @@ function updateHazards(dt, time, cx, cz, speed, onFall) {
     if (sh.kind === 'kid') { // run from one random spot to the next
       if (sh.bump <= 0) {
         if (!sh.way || !sh.way.length) { // new target: always walk via the cross aisles (never through shelves)
-          const a = AISLES[RI(0, 6)], tx = a.cx + R(-1.4, 1.4), tz = rng() < 0.5 ? pick([12, 29, 46.3]) : R(HALVES[RI(0, 1)][0] + 1, HALVES[1][1] - 1);
-          const cross = [12, 29, 46.3].reduce((b, c) => (Math.abs(c - sh.z) < Math.abs(b - sh.z) ? c : b), 12);
-          const tcross = [12, 29, 46.3].reduce((b, c) => (Math.abs(c - tz) < Math.abs(b - tz) ? c : b), 12);
+          const hf = HALVES[RI(0, HALVES.length - 1)];
+          const a = AISLES[RI(0, AISLES.length - 1)], tx = a.cx + R(-1.2, 1.2), tz = rng() < 0.5 ? pick(CROSS) : R(hf[0] + 1, hf[1] - 1);
+          const near = (zz) => CROSS.reduce((b, c) => (Math.abs(c - zz) < Math.abs(b - zz) ? c : b), CROSS[0]);
+          const cross = near(sh.z), tcross = near(tz);
           sh.way = Math.abs(tx - sh.x) > 2.5 ? [[sh.x, cross], [tx, cross], [tx, tcross], [tx, tz]] : [[tx, tz]];
         }
         const [wx, wz] = sh.way[0], dx = wx - sh.x, dz = wz - sh.z, d = Math.hypot(dx, dz);
