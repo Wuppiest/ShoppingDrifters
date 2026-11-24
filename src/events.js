@@ -160,8 +160,9 @@ const EV = (() => {
     SPOTS[p.id] = { ax: c.x - 0.4, az: c.z, bx: c.x + 0.4, bz: c.z, nx: 0, nz: -1, mx: c.x, mz: c.z, y: 0.7 };
     p.moved = true;
     if (G.markers[p.id]) scene.remove(G.markers[p.id].g);
-    G.markers[p.id] = makeMarker(SPOTS[p.id]);
-    G.markers[p.id].arrow.position.set(c.x, 2.3, c.z);
+    G.markers[p.id] = makeMarker(SPOTS[p.id], p);
+    G.markers[p.id].arrow.position.set(c.x, markerY(), c.z);
+    G.markers[p.id].beam.position.set(c.x, markerY() / 2, c.z);
     const where = c.z < CROSS[CROSS.length - 1] - 1 ? `in einem Quergang bei Gang ${c.a + 1}` : `im hinteren Gang`;
     announce(`${p.e} <b>${p.n}</b> wurde umgeräumt – jetzt auf einer Aktionsinsel ${where}!`, 6000);
     const li = $('li_' + p.id); if (li) li.classList.add('moved');
