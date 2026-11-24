@@ -3494,8 +3494,8 @@ function updateSkids(marking) {
 const markerMat = new T.MeshBasicMaterial({ color: '#ffd21f', fog: false });
 const beamMat = new T.MeshBasicMaterial({ color: '#ffe066', transparent: true, opacity: 0.22, depthWrite: false, fog: false });
 const markerY = () => Math.min(STORE.H - 2.1, 3.7); // high above the shelves → visible from everywhere
-const frameMat = new T.MeshBasicMaterial({ color: '#ffe066', transparent: true, opacity: 0.3, depthWrite: false, side: T.DoubleSide });
-const edgeMat = new T.MeshBasicMaterial({ color: '#ffd21f' });
+const frameMat = new T.MeshBasicMaterial({ color: '#ffe066', transparent: true, opacity: 0.3, depthWrite: false, side: T.DoubleSide, fog: false });
+const edgeMat = new T.MeshBasicMaterial({ color: '#ffd21f', fog: false });
 function makeMarker(sp, p) {
   const g = new T.Group();
   const arrow = new T.Group();
@@ -3508,11 +3508,10 @@ function makeMarker(sp, p) {
   icon.scale.set(0.6, 0.6, 1); icon.position.y = 0.75; arrow.add(icon);
   // light beam down to the shelf
   const beam = new T.Mesh(new T.CylinderGeometry(0.12, 0.12, 1, 8, 1, true), beamMat);
-  g.add(beam);
+  // (arrow + beam are kept as objects but not shown – only the shelf highlight is used)
   const cone = new T.Mesh(new T.ConeGeometry(0.22, 0.4, 4), markerMat); cone.rotation.x = PI; arrow.add(cone);
   const stem = new T.Mesh(new T.BoxGeometry(0.12, 0.3, 0.12), markerMat); stem.position.y = 0.32; arrow.add(stem);
   arrow.position.set(sp.mx + sp.nx * 0.9, markerY(), sp.mz + sp.nz * 0.9);
-  g.add(arrow);
   beam.position.set(arrow.position.x, markerY() / 2, arrow.position.z); beam.scale.y = markerY();
   const len = Math.hypot(sp.bx - sp.ax, sp.bz - sp.az) + 0.3;
   const frame = new T.Mesh(new T.PlaneGeometry(len, 1.95), frameMat);
@@ -3922,7 +3921,7 @@ function updatePlay(dt) {
     m.g.visible = true;
     m.arrow.position.y = markerY() + Math.sin(G.clock * 4) * 0.12; m.arrow.rotation.y += dt * 2.5;
     m.arrow.scale.setScalar(m.vis * clamp(md / 10, 1, 2));
-    m.frame.visible = md < 16;
+    m.frame.visible = true;
   }
   frameMat.opacity = 0.3 + Math.sin(G.clock * 6) * 0.12;
   if (near !== G.near) {

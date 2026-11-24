@@ -34,7 +34,7 @@ Wird automatisch erkannt (am besten im Querformat). Sobald die Tastatur benutzt 
 - Oben links läuft die Uhr, oben rechts steht die Einkaufsliste.
 - Fährst du zu lange zu langsam, startet ein Countdown – läuft er ab, ist die Runde vorbei. Die Mindestgeschwindigkeit ist auf dem Tacho rot markiert. Direkt vor einem gesuchten Produkt darfst du anhalten.
 - Schräg an Regalen entlangschrammen (Wall-Ride) kostet kaum Tempo und sprüht Funken – frontal reinkrachen bremst hart.
-- Über jedem gesuchten Produkt schwebt im ganzen Laden sichtbar ein gelber Pfeil mit Produkt-Symbol; aus der Nähe leuchtet zusätzlich das Regalfach.
+- Das Regalfach jedes gesuchten Produkts leuchtet gelb – im ganzen Laden sichtbar.
 - Ist alles eingeladen, ab in eine der Kassen (die Lampen werden grün).
 - Jedes Level wird schwerer: längere Liste, höheres Mindesttempo und nach und nach neue Hindernisse:
 
