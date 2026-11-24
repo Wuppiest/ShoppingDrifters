@@ -546,7 +546,7 @@ function die() {
 function retry() { show('dead', false); show('pause', false); setupLevel(G.level); beginIntro(false); }
 // grabbing: hold E near a wanted product. Slow enough (≤ GRAB_KMH) → it goes into the cart,
 // also while rolling past. Too fast → you knock it off the shelf and it falls on the floor.
-const GRAB_KMH = 15;
+const GRAB_KMH = 25;
 function tryGrab(id) {
   const kmh = Math.hypot(C.vx, C.vz) * 3.6;
   if (kmh <= GRAB_KMH) { pickup(id, kmh > 4); return; }

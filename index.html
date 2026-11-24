@@ -232,7 +232,7 @@
     <div class="keys kbOnly">
       <kbd>W</kbd> Gas &nbsp; <kbd>S</kbd> Bremsen / Rückwärts &nbsp; <kbd>A</kbd><kbd>D</kbd> Lenken<br>
       <kbd>Leertaste</kbd> Hockey-Stopp (quer reinrutschen + bremsen, mit <kbd>A</kbd><kbd>D</kbd> weiterdrehen)<br>Lang driften füllt die Nitro-Flasche → <kbd>Shift</kbd> zünden (3 Sek.)<br>
-      <kbd>E</kbd> halten = Produkt einladen (auch im Vorbeifahren bis 15 km/h) &nbsp; <kbd>Maus</kbd> Umschauen &nbsp; <kbd>Esc</kbd>/<kbd>P</kbd> Pause
+      <kbd>E</kbd> halten = Produkt einladen (auch im Vorbeifahren bis 25 km/h) &nbsp; <kbd>Maus</kbd> Umschauen &nbsp; <kbd>Esc</kbd>/<kbd>P</kbd> Pause
     </div>
   </div>
 </div>
@@ -3648,7 +3648,7 @@ function die() {
 function retry() { show('dead', false); show('pause', false); setupLevel(G.level); beginIntro(false); }
 // grabbing: hold E near a wanted product. Slow enough (≤ GRAB_KMH) → it goes into the cart,
 // also while rolling past. Too fast → you knock it off the shelf and it falls on the floor.
-const GRAB_KMH = 15;
+const GRAB_KMH = 25;
 function tryGrab(id) {
   const kmh = Math.hypot(C.vx, C.vz) * 3.6;
   if (kmh <= GRAB_KMH) { pickup(id, kmh > 4); return; }

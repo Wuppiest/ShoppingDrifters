@@ -13,7 +13,7 @@ Arbeite die Einkaufsliste so schnell wie möglich ab und drifte danach zur Kasse
 | A / D | Lenken |
 | Leertaste | **Hockey-Stopp** – Räder blockieren: der Wagen rutscht quer weiter, bremst hart und kippt auf zwei Räder; mit A/D dabei die Front weiterdrehen |
 | Shift | **Nitro zünden** – lange driften und geradeziehen füllt die Nitro-Flasche am Lenker, dann hast du 3 Sekunden |
-| E (halten) | Produkt einladen – geht auch im Vorbeirollen bis 15 km/h; schneller = es fällt runter |
+| E (halten) | Produkt einladen – geht auch im Vorbeirollen bis 25 km/h; schneller = es fällt runter |
 | Maus / Finger ziehen | Umschauen |
 | Esc / P | Pause |
 
